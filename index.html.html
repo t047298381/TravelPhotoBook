@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Travel Photo Book Studio - Cloud v5 (Full)</title>
+  <!-- 引入 Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --ink: #4A4A4A;
+      --muted: #8F887E;
+      --soft: #B8B3AA;
+      --line: #E5E0D8;
+      --panel: #F8F5F0;
+      --paper: #FAF8F3;
+      --bg: #E5E0D8;
+      --blue: #5D8FC5;
+      --shadow: 0 24px 70px rgba(66, 56, 45, .17);
+      --space-section: 22px;
+      --space-title-content: 12px;
+      --space-field: 16px;
+      --space-control-note: 6px;
+      --space-button-stack: 10px;
+      --space-grid: 10px;
+      --copy-line-height: 1.72;
+      --meta-line-height: 1.62;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-serif, "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+    }
+    button, input, textarea, select {
+      font-family: ui-sans-serif, "Noto Sans TC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: inherit;
+    }
+    button { border: 0; cursor: pointer; background: transparent; }
+    .app {
+      display: grid;
+      grid-template-columns: 236px minmax(0, 1fr) 304px;
+      width: 100vw;
+      height: 100vh;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .sidebar, .inspector {
+      height: 100vh;
+      min-height: 0;
+      overflow: hidden;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      z-index: 3;
+    }
+    .sidebar { border-right: 1px solid var(--line); }
+    .inspector { border-left: 1px solid var(--line); }
+    .brand, .panel-head {
+      flex: 0 0 auto;
+      padding: 18px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(250,248,243,.76);
+    }
+    .brand-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .brand h1 { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; font-size:15px; line-height:1; letter-spacing:.22em; }
+    .brand p, .eyebrow { margin:7px 0 0; color:var(--soft); font-family:ui-sans-serif,system-ui,sans-serif; font-size:10px; letter-spacing:.2em; text-transform:uppercase; }
+    .tiny-btn { background:var(--soft); color:#fff; padding:7px 9px; border-radius:999px; font-size:11px; letter-spacing:.08em; white-space:nowrap; font-weight:400; transition:background .15s; }
+    .tiny-btn:hover { background:#A7A198; }
+    .thumb-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px;
+      scrollbar-gutter: stable;
+    }
+    .thumb { padding:9px; border:1px solid transparent; border-radius:12px; margin-bottom:10px; cursor:pointer; }
+    .thumb:hover { background:rgba(255,255,255,.36); }
+    .thumb.active { background:rgba(255,255,255,.74); border-color:var(--soft); }
+    .thumb-meta { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:7px; color:var(--muted); font-size:10px; letter-spacing:.08em; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+    .thumb-meta-main { display:flex; align-items:center; gap:8px; min-width:0; }
+    .thumb-delete { width:24px; height:24px; border-radius:999px; display:grid; place-items:center; color:#9A9288; border:1px solid transparent; background:rgba(255,255,255,.22); font-size:12px; line-height:1; padding:0; }
+    .thumb-delete:hover { color:#A15E5E; border-color:rgba(161,94,94,.28); background:rgba(255,255,255,.82); }
+    .thumb-stage { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:5px; background:var(--paper); box-shadow:0 7px 18px rgba(88,76,59,.08); }
+    .thumb-inner { position:absolute; transform-origin:top left; }
+    .thumb-stage .mini-line, .canvas .fold-line { position:absolute; top:0; bottom:0; left:50%; width:1px; background:rgba(0,0,0,.10); z-index:90; pointer-events:none; }
+    .workspace {
+      height: 100vh;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 16%, rgba(255,255,255,.45), transparent 33%), linear-gradient(130deg, rgba(246,241,233,.58), rgba(210,202,190,.56));
+    }
+    .topbar { display:flex; flex:0 0 auto; justify-content:space-between; align-items:center; gap:18px; padding:13px 22px; border-bottom:1px solid rgba(255,255,255,.38); color:var(--muted); font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; letter-spacing:.08em; }
+    .topbar strong { color:var(--ink); letter-spacing:.14em; font-weight:500; }
+    .status-pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill { padding:6px 10px; border:1px solid rgba(255,255,255,.72); background:rgba(255,255,255,.38); border-radius:999px; color:#756E65; white-space:nowrap; transition: background 0.3s, color 0.3s; }
+    
+    .pill.save-btn { cursor:pointer; background:var(--soft); border:1px solid transparent; color:#fff; font-weight:400; font-size:11px; letter-spacing:.08em; padding:7px 14px; }
+    .pill.save-btn:hover { background:#A7A198; }
+    .pill.save-btn.saving { background:rgba(184,179,170,.4); color:#fff; border-color:transparent; pointer-events:none; }
+    
+    .canvas-wrap { min-height:0; min-width:0; overflow:auto; display:flex; align-items:center; justify-content:center; padding:44px 62px; }
+    .canvas-shell { position:relative; padding:20px; border-radius:22px; background:rgba(255,255,255,.24); border:1px solid rgba(255,255,255,.44); }
+    .safe-label { position:absolute; left:20px; top:-26px; font-family:ui-sans-serif,system-ui,sans-serif; color:rgba(74,74,74,.54); font-size:11px; letter-spacing:.1em; }
+    .canvas { position:relative; width:900px; height:320px; background:var(--paper); box-shadow:var(--shadow); overflow:hidden; transform-origin:center center; user-select:none; }
+    .canvas.single { width:450px; }
+    .bottom-hint { flex:0 0 auto; padding:13px 22px 17px; border-top:1px solid rgba(255,255,255,.34); color:rgba(74,74,74,.58); font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; line-height:1.65; }
+    .panel-head h2 { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+    .panel-scroll { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; padding:16px; scrollbar-gutter:stable; }
+    .section { margin-bottom:var(--space-section); padding-bottom:calc(var(--space-section) - 2px); border-bottom:1px solid rgba(229,224,216,.82); }
+    .section:last-child { border-bottom:0; margin-bottom:0; padding-bottom:0; }
+    .label { margin-bottom:var(--space-title-content); color:var(--soft); font-family:ui-sans-serif,system-ui,sans-serif; font-size:10px; line-height:1.25; letter-spacing:.19em; text-transform:uppercase; font-weight:700; }
+    .layout-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-grid); }
+    .layout-btn, .paper-btn { border:1px solid var(--line); background:rgba(255,255,255,.52); border-radius:12px; padding:11px 10px; text-align:left; transition:background .15s ease, border .15s ease; }
+    .wide-btn { border:1px solid var(--line); background:rgba(255,255,255,.52); border-radius:999px; padding:12px 14px; text-align:center; transition:background .15s ease, border .15s ease; min-height:44px; display:flex; align-items:center; justify-content:center; }
+    .layout-btn:hover, .paper-btn:hover, .wide-btn:hover { background:rgba(255,255,255,.86); }
+    .layout-btn.active, .paper-btn.active { border-color:var(--soft); background:#fff; }
+    .layout-btn span, .paper-btn span { display:block; font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; line-height:1.35; font-weight:600; margin-bottom:6px; }
+    .layout-btn small, .paper-btn small, .hint-text { display:block; color:var(--muted); font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; line-height:var(--copy-line-height); font-weight:400; }
+    .paper-row { display:grid; gap:var(--space-grid); }
+    .paper-swatch { width:100%; height:28px; border-radius:8px; border:1px solid rgba(0,0,0,.06); margin-bottom:8px; }
+    .field { margin-bottom:var(--space-field); }
+    .field label { display:block; margin-bottom:8px; color:#817A70; font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; line-height:1.35; letter-spacing:.09em; }
+    .field input[type="text"], .field input[type="number"], .field textarea, .field select { width:100%; border:1px solid var(--line); border-radius:11px; background:rgba(255,255,255,.64); color:var(--ink); padding:10px 11px; outline:none; font-size:12px; line-height:1.55; resize:vertical; }
+    .field textarea { min-height:88px; }
+    .range-row { display:grid; grid-template-columns:1fr 42px; align-items:center; gap:9px; }
+    input[type="range"] { width:100%; accent-color:var(--soft); }
+    .wide-btn { width:100%; font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; line-height:1.35; letter-spacing:.08em; color:#665F56; margin:0; cursor:pointer; }
+    
+    .wide-btn.primary { background:var(--soft); color:#fff; border-color:var(--soft); font-weight:400; border-radius:999px; }
+    .wide-btn.primary:hover { background:#A7A198; border-color:#A7A198; }
+    
+    .wide-btn.danger { color:#A15E5E; border-color:rgba(161,94,94,.24); background:rgba(255,255,255,.38); border-radius:999px; }
+    .tool-row { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-grid); margin:0; }
+    .four-fields { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-grid); }
+    .stat-box { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-grid); }
+    .stat { border:1px solid var(--line); border-radius:12px; padding:10px 6px; background:rgba(255,255,255,.43); text-align:center; font-family:ui-sans-serif,system-ui,sans-serif; }
+    .stat strong { display:block; font-size:17px; color:var(--ink); }
+    .stat span { display:block; margin-top:2px; font-size:10px; color:var(--muted); letter-spacing:.08em; }
+    .block { position:absolute; outline:0 solid transparent; outline-offset:3px; }
+    .block.selected { outline:1.5px dashed var(--blue); overflow:visible; }
+    .block.photo { overflow:visible; background:transparent; }
+    .block.photo.free-photo.selected { outline-color:var(--blue); }
+    .photo-viewport { position:absolute; overflow:hidden; background:rgba(0,0,0,.035); }
+    .photo-viewport img { position:absolute; left:50%; top:50%; display:block; pointer-events:none; transform-origin:center center; }
+    .placeholder { height:100%; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; color:#A39C93; border:1px dashed rgba(163,156,147,.45); background:repeating-linear-gradient(-45deg,rgba(255,255,255,.23),rgba(255,255,255,.23) 8px,rgba(0,0,0,.015) 8px,rgba(0,0,0,.015) 16px); font-family:ui-sans-serif,system-ui,sans-serif; font-size:10px; letter-spacing:.12em; text-align:center; }
+    .placeholder .icon { font-size:23px; opacity:.65; }
+    .block.photo.frame-thin { background:#fff; box-shadow:0 6px 18px rgba(48,42,35,.12); border:1px solid rgba(0,0,0,.08); }
+    .block.photo.frame-polaroid { background:#fff; box-shadow:0 12px 30px rgba(48,42,35,.20); border:1px solid rgba(0,0,0,.08); }
+    .block.photo.frame-polaroid::after { content:attr(data-caption); position:absolute; left:14px; right:14px; bottom:11px; height:20px; color:#9B948B; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:9px; letter-spacing:.12em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; pointer-events:none; }
+    .block.text { cursor:text; overflow:visible; white-space:pre-wrap; }
+    .block.text .editable { width:100%; outline:none; overflow:hidden; white-space:pre-wrap; word-break:break-word; margin:0; }
+    .drag-handle, .resize-handle { position:absolute; z-index:999; background:var(--blue); color:#fff; box-shadow:0 4px 12px rgba(93,143,197,.34); font-family:ui-sans-serif,system-ui,sans-serif; }
+    .drag-handle { left:-16px; top:-16px; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:12px; cursor:move; }
+    .resize-handle { width:10px; height:28px; border-radius:999px; top:50%; transform:translateY(-50%); cursor:ew-resize; opacity:.92; }
+    .resize-handle.left { left:-6px; }
+    .resize-handle.right { right:-6px; }
+    .resize-handle.br { width:13px; height:13px; right:-7px; bottom:-7px; top:auto; transform:none; cursor:nwse-resize; }
+    .block.map { overflow:hidden; background:#F3F0EA; border: 1px solid rgba(0,0,0,.04); border-radius: 4px;}
+    .map-empty { position:absolute; inset:38px; display:grid; place-items:center; border:1px dashed var(--soft); background:rgba(255,255,255,.48); color:var(--soft); text-align:center; font-family:ui-sans-serif,system-ui,sans-serif; letter-spacing:.12em; font-size:11px; z-index:2; }
+    .map-svg { width:100%; height:100%; display:block; }
+    .mini-photo, .mini-map, .mini-text, .mini-timeline { position:absolute; overflow:hidden; }
+    .mini-timeline { background:rgba(255,255,255,.4); border:1px solid #E5E0D8; border-radius:2px; }
+    .mini-photo { background:rgba(0,0,0,.055); }
+    .mini-photo.frame-thin, .mini-photo.frame-polaroid { overflow:visible; background:#fff; box-shadow:0 2px 8px rgba(48,42,35,.12); border:1px solid rgba(0,0,0,.06); }
+    .mini-photo .mini-photo-viewport { position:absolute; overflow:hidden; background:rgba(0,0,0,.055); }
+    .mini-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+    .mini-map { background:#F3F0EA; border:1px dashed #D1CDC4; }
+    .toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(14px); background:rgba(44,39,34,.9); color:#fff; padding:10px 14px; border-radius:999px; font-family:ui-sans-serif,system-ui,sans-serif; font-size:12px; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease; z-index:80; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    .exporting { position:fixed; inset:0; z-index:70; background:rgba(250,248,243,.74); display:none; place-items:center; backdrop-filter:blur(5px); font-family:ui-sans-serif,system-ui,sans-serif; color:#4A4A4A; letter-spacing:.08em; }
+    .exporting.show { display:grid; }
+    
+    .modal { position:fixed; inset:0; z-index:60; display:grid; grid-template-rows:auto 1fr auto; background:rgba(42,36,30,.58); backdrop-filter:blur(8px); padding:22px; }
+    .modal.hidden { display:none; }
+    .modal-head, .modal-foot { max-width:1060px; width:min(100%,1060px); margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#fff; font-family:ui-sans-serif,system-ui,sans-serif; }
+    .modal-head h3 { margin:0; font-size:14px; letter-spacing:.14em; font-weight:500; }
+    .modal-body { display:grid; place-items:center; min-height:0; overflow:auto; perspective:1600px; background:rgba(245,242,237,.22) !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:18px !important; margin:18px auto !important; width:min(100%,1280px) !important; }
+    .book-stage { position:relative; display:grid; grid-template-columns:450px 450px; background:transparent !important; padding:26px !important; border-radius:0 !important; box-shadow:none !important; justify-content:center; align-items:center; transform-style:flat !important; isolation:auto !important; gap:0 !important; }
+    .book-stage.book-cover, .book-stage.book-back { grid-template-columns:450px !important; }
+    .book-stage.book-spread { grid-template-columns:450px 450px !important; gap:0 !important; }
+    .book-stage::before, .book-stage::after, .book-gutter, .book-shadow-left, .book-shadow-right { display:none !important; content:none !important; }
+    .book-stage.book-spread::after { display:block !important; content:"" !important; position:absolute; left:50%; top:26px; bottom:26px; width:1px; background:rgba(0,0,0,.13); z-index:60; pointer-events:none; }
+    .a5-page { width:450px; height:320px; overflow:hidden; position:relative; background:#fff !important; box-shadow:0 12px 30px rgba(34,25,18,.10), inset 0 0 0 1px rgba(0,0,0,.025) !important; border-radius:2px !important; transform:none !important; }
+    .book-stage.book-spread .a5-page:first-of-type { border-radius:2px 0 0 2px !important; }
+    .book-stage.book-spread .a5-page:last-of-type { border-radius:0 2px 2px 0 !important; }
+    .page-edge-label { position:absolute; left:28px; bottom:8px; color:rgba(255,255,255,.82); font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; letter-spacing:.12em; }
+    .a5-inner { position:absolute; top:0; height:320px; }
+    .a5-inner .canvas { transform:none !important; box-shadow:none !important; }
+    .blank-page { display:grid; place-items:center; color:#B8B3AA; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; letter-spacing:.14em; }
+    .modal-btn { border:1px solid rgba(255,255,255,.42); background:rgba(255,255,255,.16); color:#fff; padding:9px 13px; border-radius:999px; font-size:12px; letter-spacing:.08em; transition: background .15s; }
+    .modal-btn.dark { background:var(--soft); border-color:var(--soft); }
+    .modal-btn.dark:hover { background:#A7A198; }
+    
+    .wide-btn.primary .export-badge { background:#fff; color:var(--soft); font-weight:600; }
+    .export-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; border-radius:999px; background:rgba(184,179,170,.18); color:#817A70; margin-right:5px; font-size:11px; }
+    
+    .thumb-list::-webkit-scrollbar, .panel-scroll::-webkit-scrollbar, .canvas-wrap::-webkit-scrollbar, .modal-body::-webkit-scrollbar { width:10px; height:10px; }
+    .thumb-list::-webkit-scrollbar-thumb, .panel-scroll::-webkit-scrollbar-thumb, .canvas-wrap::-webkit-scrollbar-thumb, .modal-body::-webkit-scrollbar-thumb { background:rgba(143,136,126,.42); border-radius:999px; border:3px solid transparent; background-clip:padding-box; }
+    .thumb-list::-webkit-scrollbar-track, .panel-scroll::-webkit-scrollbar-track, .canvas-wrap::-webkit-scrollbar-track, .modal-body::-webkit-scrollbar-track { background:rgba(255,255,255,.22); }
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 196px 1fr 280px; }
+      .canvas-wrap { padding:30px; }
+      .canvas { transform:scale(.88) !important; }
+    }
+    .module-title { margin:16px 0 9px; font-size:10px; line-height:1.35; letter-spacing:.08em; color:#8F887E; font-family:ui-sans-serif,system-ui,sans-serif; text-transform:uppercase; font-weight:600; }
+    .layout-btn.disabled { opacity:.38; pointer-events:none; filter:grayscale(.65); }
+    .book-warning { display:block; margin-top:var(--space-control-note); padding:11px 12px; border:1px solid rgba(184,179,170,.45); background:rgba(255,255,255,.42); border-radius:12px; font-size:11px; line-height:var(--copy-line-height); color:#756E65; font-family:ui-sans-serif,system-ui,sans-serif; }
+    .quality-card { border:1px solid rgba(184,179,170,.34); background:rgba(255,255,255,.46); border-radius:14px; padding:11px; font-family:ui-sans-serif,system-ui,sans-serif; }
+    .quality-card strong { display:block; font-size:15px; letter-spacing:.06em; color:#4A4A4A; margin-bottom:4px; }
+    .quality-card small { display:block; color:#8F887E; line-height:var(--copy-line-height); }
+    .zoom-control-row { display:grid; grid-template-columns:44px 1fr 44px; gap:8px; align-items:center; }
+    .zoom-control-row button { border:1px solid var(--line); background:rgba(255,255,255,.72); border-radius:12px; padding:9px 0; font-size:16px; font-family:ui-sans-serif,system-ui,sans-serif; }
+    .zoom-control-row span { text-align:center; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:#756E65; font-size:12px; }
+    .freeform-note { display:block; margin-top:var(--space-control-note); color:#8F887E; font-size:11px; line-height:var(--copy-line-height); font-family:ui-sans-serif,system-ui,sans-serif; }
+    .hint-text { margin-top:var(--space-control-note); }
+    .hint-text + .wide-btn, .freeform-note + .wide-btn { margin-top:var(--space-control-note); }
+    .section > .wide-btn + .wide-btn, .section > .wide-btn + .tool-row, .tool-row + .wide-btn { margin-top:var(--space-button-stack); }
+    .tool-row .wide-btn { margin:0; }
+    .field:last-child, .four-fields:last-child { margin-bottom:0; }
+
+    /* ====== 雲端專屬選單美化 ====== */
+    #cloudProjectSelect {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url('data:image/svg+xml;utf8,<svg fill="%238F887E" height="20" viewBox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+      background-repeat: no-repeat;
+      background-position-x: 96%;
+      background-position-y: center;
+      border-radius: 999px !important;
+      padding: 10px 32px 10px 14px !important;
+      border: 1px solid var(--line);
+      background-color: rgba(255,255,255,.64);
+      outline: none;
+      font-size: 12px;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    #cloudProjectSelect:hover {
+      background-color: rgba(255,255,255,.9);
+    }
+    .slim-btn {
+      width: auto !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      padding: 10px 20px !important;
+      border-radius: 999px !important;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-row">
+          <div><h1>STUDIO</h1><p>Travel Photo Book v5</p></div>
+          <button class="tiny-btn" data-action="addSpreadPage">+ 增頁</button>
+        </div>
+      </div>
+      <div id="thumbList" class="thumb-list"></div>
+    </aside>
+    <main class="workspace">
+      <div class="topbar">
+        <div><strong id="currentTitle">版面預覽</strong><span id="currentHint"></span></div>
+        <div class="status-pills">
+          <button class="pill save-btn" data-action="manualSave" id="saveBtn">手動儲存</button>
+          <span class="pill" id="sizePill">900 × 320</span>
+          <span class="pill">獨立捲動</span>
+          <span class="pill">v5 雲端版</span>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <div class="canvas-shell">
+          <div class="safe-label" id="safeLabel">跨頁畫布 / 900 × 320 px</div>
+          <div id="canvas" class="canvas"></div>
+        </div>
+      </div>
+      <div class="bottom-hint">v5：完整保留 v4 所有功能 (包含 PDF/HTML 匯出、時間軸、EXIF)，並新增雲端專案儲存支援。</div>
+    </main>
+    <aside class="inspector">
+      <div class="panel-head"><h2 id="panelTitle">頁面設定</h2></div>
+      <div id="inspector" class="panel-scroll"></div>
+    </aside>
+  </div>
+  
+  <input id="photoInput" type="file" accept="image/*" hidden />
+  <div id="toast" class="toast"></div>
+  <div id="exporting" class="exporting">處理中，請稍候...</div>
+  
+  <!-- 翻頁預覽 Modal (來自 v4) -->
+  <div id="flipModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-head"><h3>A5 翻頁電子書預覽</h3><button class="modal-btn" data-action="closeFlip">關閉</button></div>
+    <div class="modal-body"><div id="bookStage" class="book-stage"></div></div>
+    <div class="modal-foot"><button class="modal-btn" data-action="prevFlip">← 上一跨頁</button><span id="flipCounter">1 / 1</span><button class="modal-btn dark" data-action="nextFlip">下一跨頁 →</button></div>
+  </div>
+
+  <!-- 雲端專案上傳 Modal -->
+  <div id="projectModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-body" style="width: 420px !important; min-height: auto; padding: 32px; text-align: center; background: #FAF8F3 !important; box-shadow: 0 24px 60px rgba(0,0,0,0.2) !important; border:none !important;">
+      <h3 style="margin:0 0 8px 0; color:#4A4A4A; font-family: ui-sans-serif,system-ui,sans-serif; letter-spacing: 0.1em; font-size:16px;">備份專案至雲端</h3>
+      <p style="font-size:12px; color:#8F887E; margin-bottom: 24px; line-height:1.6;">請為此相簿命名，系統將在指定的 Google Drive 資料夾內建立此專案，並上傳所有照片原檔與資料。</p>
+      <input type="text" id="projectNameInput" placeholder="例如：2026 京都賞櫻" style="width:100%; padding: 12px; border: 1px solid #E5E0D8; border-radius: 8px; margin-bottom: 24px; text-align:center; font-size:14px; outline:none; background:#fff; color:#4A4A4A;">
+      
+      <div id="uploadProgressArea" class="hidden" style="margin-bottom: 24px;">
+        <div style="font-size: 11px; color:#756E65; margin-bottom: 8px; text-align:left; letter-spacing:0.05em;" id="uploadStatusText">準備上傳...</div>
+        <div style="width: 100%; height: 6px; background: #E5E0D8; border-radius: 3px; overflow: hidden;">
+          <div id="uploadProgressBar" style="width: 0%; height: 100%; background: #5D8FC5; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <div id="projectModalBtns" style="display:flex; gap: 12px; justify-content: center;">
+        <button class="modal-btn" data-action="closeProjectModal" style="color:#756E65; border-color:#D1CDC4; background:#fff; padding: 10px 24px;">取消</button>
+        <button class="modal-btn dark" data-action="confirmCloudUpload" style="padding: 10px 24px;">開始上傳</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 0. CONFIGURATION & CONSTANTS
+    // ==========================================
+    // ⭐ 請在這裡填入您的 Google Client ID，才能正式連線！
+    const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE'; 
+
+    const PAGE_W = 450, PAGE_H = 320, PRINT_MM_W = 210, PRINT_MM_H = 148, PDF_EXPORT_SCALE = 6, SPREAD_W = 900, CANVAS_SCALE = 1.08;
+    const THEME = { text:'#4A4A4A', accent:'#B8B3AA', muted:'#8F887E' };
+    const PAPER_TYPES = [
+      { id:'snow', name:'雪銅紙', detail:'純白，接近送印預覽', bg:'#FFFFFF' },
+      { id:'dowling', name:'道林紙', detail:'米白，預設書頁感', bg:'#FAF8F3' },
+      { id:'sunlight', name:'沐光紙', detail:'暖黃，旅行手札感', bg:'#F5F0EA' }
+    ];
+    // v4 完整 Layouts (不再省略)
+    const LAYOUTS = {
+      cover: { label:'封面', spread:false, hint:'建議圖片尺寸：400 × 250', group:'單頁', blocks:[
+        { type:'photo', x:60, y:50, w:330, h:170, zIndex:1, placeholder:'封面大圖 / 400×250' },
+        { type:'text', x:60, y:246, w:250, h:22, zIndex:3, value:'A Travel Photo Book', style:{ fontSize:8, letterSpacing:4, color:'#B8B3AA', fontFamily:'sans-serif', lineHeight:1.4, verticalAlign:'top' } },
+        { type:'text', x:60, y:270, w:300, h:36, zIndex:3, value:'Every Place Has a Memory', style:{ fontSize:22, letterSpacing:3, color:'#4A4A4A', fontFamily:'serif', fontWeight:300, lineHeight:1.25, verticalAlign:'top' } }
+      ]},
+      spread_full_bleed: { label:'滿版跨頁', spread:true, hint:'以滿版照片營造視覺張力', group:'跨頁', blocks:[
+        { type:'photo', x:0, y:0, w:900, h:320, zIndex:1, placeholder:'滿版跨頁照片 / 900×320' },
+        { type:'text', x:62, y:214, w:390, h:34, zIndex:3, value:'Where the Light First Found Us', style:{ fontSize:18, letterSpacing:2.8, color:'#FFFFFF', fontFamily:'serif', lineHeight:1.2, fontWeight:300, textShadow:'0 2px 16px rgba(0,0,0,.55)', verticalAlign:'top' } },
+        { type:'text', x:64, y:253, w:280, h:20, zIndex:3, value:'A photographic note from the road', style:{ fontSize:8, letterSpacing:2.1, color:'#FFFFFF', fontFamily:'sans-serif', lineHeight:1.4, textShadow:'0 2px 12px rgba(0,0,0,.55)', verticalAlign:'top' } }
+      ]},
+      spread_cinematic: { label:'電影感跨頁', spread:true, hint:'寬螢幕比例搭配上下黑框，營造電影感', group:'跨頁', blocks:[
+        { type:'text', x:0, y:0, w:900, h:44, zIndex:1, value:'', style:{ fontSize:1, letterSpacing:0, color:'#111111', backgroundColor:'#111111', fontFamily:'sans-serif', lineHeight:1, verticalAlign:'top' } },
+        { type:'photo', x:0, y:44, w:900, h:232, zIndex:2, placeholder:'電影感寬螢幕照片 / 900×232' },
+        { type:'text', x:0, y:276, w:900, h:44, zIndex:1, value:'', style:{ fontSize:1, letterSpacing:0, color:'#111111', backgroundColor:'#111111', fontFamily:'sans-serif', lineHeight:1, verticalAlign:'top' } },
+        { type:'text', x:62, y:291, w:330, h:18, zIndex:3, value:'Scenes From the Open Road', style:{ fontSize:10, letterSpacing:2.6, color:'#FFFFFF', fontFamily:'serif', lineHeight:1.3, fontWeight:300, verticalAlign:'top' } },
+        { type:'text', x:742, y:292, w:96, h:16, zIndex:3, value:'TRAVEL / 01', style:{ fontSize:7, letterSpacing:1.8, color:'#B8B3AA', fontFamily:'monospace', lineHeight:1.4, textAlign:'right', verticalAlign:'top' } }
+      ]},
+      spread_three_five: { label:'3/5 圖文跨頁', spread:true, hint:'左側 3/5 大圖，右側文字留白', group:'跨頁', blocks:[
+        { type:'photo', x:0, y:0, w:540, h:320, zIndex:1, placeholder:'3/5 跨頁主圖 / 540×320' },
+        { type:'text', x:606, y:76, w:210, h:52, zIndex:3, value:'A Slow\nAfternoon', style:{ fontSize:21, letterSpacing:4, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.16, fontWeight:300, verticalAlign:'top' } },
+        { type:'text', x:608, y:158, w:214, h:90, zIndex:3, value:'Leave space for the air between places; let one photograph hold the weather, the silence, and the reason you stayed.', style:{ fontSize:11, letterSpacing:1, color:'#4A4A4A', fontFamily:'serif', lineHeight:2.05, verticalAlign:'top' } }
+      ]},
+      spread_three_five_reverse: { label:'3/5 反向圖文', spread:true, hint:'左文右圖，適合章節開場', group:'跨頁', blocks:[
+        { type:'text', x:80, y:72, w:250, h:44, zIndex:3, value:'The Road\nTook Its Time', style:{ fontSize:22, letterSpacing:5, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.12, fontWeight:300, verticalAlign:'top' } },
+        { type:'text', x:82, y:150, w:230, h:86, zIndex:3, value:'A chapter opens softly: a sentence, a pause, and the memory of streets still warm with evening light.', style:{ fontSize:11, letterSpacing:1, color:'#4A4A4A', fontFamily:'serif', lineHeight:2.05, verticalAlign:'top' } },
+        { type:'photo', x:360, y:0, w:540, h:320, zIndex:1, placeholder:'右側 3/5 主圖 / 540×320' }
+      ]},
+      single_vertical_bleed_center: { label:'單頁直圖滿高', spread:false, hint:'直式照片在單頁中央，上下滿版，左右留白', group:'單頁', blocks:[
+        { type:'text', x:44, y:70, w:90, h:62, zIndex:3, value:'Quiet\nCorners', style:{ fontSize:15, letterSpacing:2.4, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.25, fontWeight:300, verticalAlign:'top' } },
+        { type:'photo', x:156, y:0, w:138, h:320, zIndex:1, placeholder:'單頁直式滿高照片' },
+        { type:'text', x:326, y:226, w:82, h:44, zIndex:3, value:'A portrait of place', style:{ fontSize:8, letterSpacing:1.8, color:'#B8B3AA', fontFamily:'monospace', lineHeight:1.65, verticalAlign:'top' } }
+      ]},
+      single_vertical_wide_margin: { label:'單頁直圖留白', spread:false, hint:'單頁中線直式照片，周圍大量留白', group:'單頁', blocks:[
+        { type:'photo', x:145, y:28, w:160, h:264, zIndex:1, placeholder:'單頁直式照片' },
+        { type:'text', x:48, y:238, w:72, h:36, zIndex:3, value:'Still, I\nRemember', style:{ fontSize:12, letterSpacing:2.8, color:'#B8B3AA', fontFamily:'serif', lineHeight:1.25, verticalAlign:'top' } }
+      ]},
+      spread_left_one_right_four: { label:'左一右四', spread:true, hint:'左頁單張主圖，右頁四張組圖', group:'跨頁', blocks:[
+        { type:'photo', x:38, y:30, w:374, h:260, zIndex:1, placeholder:'左頁主圖 / 374×260' },
+        { type:'photo', x:492, y:38, w:154, h:106, zIndex:1, placeholder:'右圖 1' },
+        { type:'photo', x:686, y:38, w:154, h:106, zIndex:1, placeholder:'右圖 2' },
+        { type:'photo', x:492, y:178, w:154, h:106, zIndex:1, placeholder:'右圖 3' },
+        { type:'photo', x:686, y:178, w:154, h:106, zIndex:1, placeholder:'右圖 4' },
+        { type:'text', x:494, y:150, w:220, h:18, zIndex:3, value:'Small scenes along the way', style:{ fontSize:7.5, letterSpacing:1.8, color:'#B8B3AA', fontFamily:'monospace', lineHeight:1.3, verticalAlign:'top' } }
+      ]},
+      spread_polaroid_wall: { label:'拍立得拼貼', spread:true, hint:'三張拍立得外框，適合生活感', group:'外框', blocks:[
+        { type:'photo', x:88, y:44, w:194, h:226, zIndex:1, frame:'polaroid', frameCaption:'DAY 01', placeholder:'拍立得 1' },
+        { type:'photo', x:354, y:34, w:194, h:226, zIndex:2, frame:'polaroid', frameCaption:'DAY 02', placeholder:'拍立得 2' },
+        { type:'photo', x:620, y:52, w:194, h:226, zIndex:1, frame:'polaroid', frameCaption:'DAY 03', placeholder:'拍立得 3' },
+        { type:'text', x:328, y:286, w:260, h:18, zIndex:3, value:'Postcards from ordinary days', style:{ fontSize:9, letterSpacing:2.5, color:'#B8B3AA', fontFamily:'serif', textAlign:'center', lineHeight:1.4, verticalAlign:'top' } }
+      ]},
+      single_photo_text: { label:'單頁圖文', spread:false, hint:'單頁照片加短文，可作補頁', group:'單頁', blocks:[
+        { type:'photo', x:48, y:46, w:224, h:156, zIndex:1, placeholder:'單頁照片 / 224×156' },
+        { type:'text', x:48, y:222, w:220, h:42, zIndex:3, value:'A small frame, a longer memory.', style:{ fontSize:10, letterSpacing:1.6, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.7, verticalAlign:'top' } },
+        { type:'text', x:322, y:48, w:48, h:170, zIndex:3, value:'T\nR\nA\nV\nE\nL', style:{ fontSize:15, letterSpacing:2, color:'#B8B3AA', fontFamily:'serif', lineHeight:1.55, textAlign:'center', verticalAlign:'top' } }
+      ]},
+      spread_map: { label:'3/5 地圖圖文', spread:true, hint:'左側簡化地圖，右側文字留白', group:'功能', blocks:[
+        { type:'map_data', x:0, y:0, w:540, h:320, zIndex:1, gpsData:[{label:'Taipei',lat:25.033,lng:121.565},{label:'Taichung',lat:24.147,lng:120.673},{label:'Tainan',lat:22.999,lng:120.227},{label:'Kaohsiung',lat:22.627,lng:120.301}] },
+        { type:'text', x:600, y:76, w:240, h:52, zIndex:3, value:'Routes &\nReveries', style:{ fontSize:21, letterSpacing:4, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.16, fontWeight:300, verticalAlign:'top' } },
+        { type:'text', x:602, y:158, w:230, h:90, zIndex:3, value:'The map is not the journey; it is only the trace of where wonder decided to leave its mark.', style:{ fontSize:11, letterSpacing:1, color:'#4A4A4A', fontFamily:'serif', lineHeight:2.05, verticalAlign:'top' } }
+      ]},
+      single_timeline: { label:'時間軸行程', spread:false, hint:'透過 CSV 自動產生時間軸', group:'功能', blocks:[
+        { type:'text', x:40, y:40, w:200, h:30, zIndex:3, value:'Itinerary', style:{ fontSize:14, letterSpacing:4, color:'#B8B3AA', fontFamily:'sans-serif', fontWeight:600, verticalAlign:'top' } },
+        { type:'timeline_data', x:40, y:80, w:360, h:220, zIndex:1, csvData:"09:00,Arrival,Step into the city with a quiet map and an open morning\n11:30,Old Town Walk,Leave the luggage behind and follow the light through narrow streets\n13:00,Lunch Break,A small table, a local dish, and a window facing the day\n15:30,Temple Visit,Slow down for shade, stone, and the sound of footsteps\n18:00,Check-in,Return with dust on your shoes and photographs in your pocket" }
+      ]},
+      spread_freeform: { label:'全自訂圖文', spread:true, hint:'照片框可自由移動、拉寬拉高，可新增多張照片與文字', group:'自訂', blocks:[
+        { type:'photo', x:80, y:54, w:260, h:188, zIndex:1, freeFrame:true, placeholder:'自訂照片框 / 可拖曳拉伸' },
+        { type:'text', x:520, y:82, w:240, h:86, zIndex:3, value:'Make Room for the Unexpected', style:{ fontSize:18, letterSpacing:3, color:'#4A4A4A', fontFamily:'serif', lineHeight:1.35, fontWeight:300, verticalAlign:'top' } },
+        { type:'text', x:520, y:190, w:260, h:42, zIndex:3, value:'Build the page like a travel desk: photographs, notes, and fragments gathered after a long day outside.', style:{ fontSize:10, letterSpacing:1, color:'#8F887E', fontFamily:'serif', lineHeight:1.8, verticalAlign:'top' } }
+      ]},
+      back_cover: { label:'封底', spread:false, hint:'簡潔收尾頁', group:'單頁', blocks:[
+        { type:'text', x:164, y:148, w:120, h:22, zIndex:1, value:'THE END', style:{ fontSize:12, letterSpacing:5, color:'#B8B3AA', fontFamily:'serif', textAlign:'center', lineHeight:1.4, verticalAlign:'top' } }
+      ]}
+    };
+
+    // ==========================================
+    // 1. STATE & DB ENGINE
+    // ==========================================
+    const state = {
+      slides: [], activeIdx: 0, selectedId: null, paperId: 'dowling',
+      uploadTargetId: null, moveState: null, panState: null, resizeState: null,
+      flipPairIndex: 0, flipTurning: false, scriptPromises: {}, eventsBound: false,
+      cloudProjects: []
+    };
+
+    const DBEngine = {
+      dbName: 'TravelBookDB_v10', storeName: 'projects',
+      getDB: () => new Promise((resolve, reject) => {
+        const req = indexedDB.open(DBEngine.dbName, 1);
+        req.onupgradeneeded = (e) => e.target.result.createObjectStore(DBEngine.storeName);
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e);
+      }),
+      save: async (stateData) => {
+        try {
+          const db = await DBEngine.getDB(); const tx = db.transaction(DBEngine.storeName, 'readwrite');
+          tx.objectStore(DBEngine.storeName).put(stateData, 'currentState');
+          return new Promise(resolve => { tx.oncomplete = () => resolve(true); tx.onerror = () => resolve(false); });
+        } catch(e) { return false; }
+      },
+      load: async () => {
+        try {
+          const db = await DBEngine.getDB(); const tx = db.transaction(DBEngine.storeName, 'readonly');
+          const req = tx.objectStore(DBEngine.storeName).get('currentState');
+          return new Promise(resolve => { req.onsuccess = () => resolve(req.result); req.onerror = () => resolve(null); });
+        } catch(e) { return null; }
+      }
+    };
+
+    // ==========================================
+    // 1.5 CLOUD ENGINE (Google Drive API / Mock)
+    // ==========================================
+    const CloudEngine = {
+      token: null,
+      mockMode: GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE',
+      
+      getToken: () => new Promise((resolve, reject) => {
+        if (CloudEngine.mockMode) return resolve('MOCK_TOKEN');
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          callback: (res) => { if (res.access_token) { CloudEngine.token = res.access_token; resolve(res.access_token); } else reject('Auth Error'); }
+        });
+        client.requestAccessToken();
+      }),
+      
+      updateProgress: (text, percent) => {
+        document.getElementById('uploadStatusText').textContent = text;
+        document.getElementById('uploadProgressBar').style.width = `${percent}%`;
+      },
+
+      uploadProject: async (parentFolderId, projectName) => {
+        CloudEngine.updateProgress('正在驗證身份...', 10);
+        await CloudEngine.getToken();
+        
+        const dataToUpload = UtilityEngine.deepClone({ slides: state.slides, paperId: state.paperId });
+        let photoBlocks = [];
+        dataToUpload.slides.forEach(slide => slide.blocks.forEach(b => { if (b.type === 'photo' && b.rawFile) photoBlocks.push(b); }));
+        
+        if (CloudEngine.mockMode) {
+          CloudEngine.updateProgress('建立專案資料夾...', 30);
+          await new Promise(r => setTimeout(r, 800));
+          for(let i=0; i<photoBlocks.length; i++) {
+            CloudEngine.updateProgress(`上傳照片 (${i+1}/${photoBlocks.length})...`, 30 + (40 * (i/photoBlocks.length)));
+            await new Promise(r => setTimeout(r, 600)); 
+            photoBlocks[i].imgSrc = `drive_mock_id_${Math.random()}`; 
+            delete photoBlocks[i].rawFile;
+          }
+          CloudEngine.updateProgress('上傳專案架構檔 (project.json)...', 80);
+          await new Promise(r => setTimeout(r, 800));
+          CloudEngine.updateProgress('上傳完成！', 100);
+          state.cloudProjects.push({ id: `mock_proj_${Date.now()}`, name: projectName });
+          return true;
+        }
+
+        try {
+          CloudEngine.updateProgress('建立專案資料夾...', 20);
+          const folderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: projectName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] })
+          }).then(r => r.json());
+          
+          const newFolderId = folderRes.id;
+          
+          for(let i=0; i<photoBlocks.length; i++) {
+            CloudEngine.updateProgress(`上傳照片 (${i+1}/${photoBlocks.length})...`, 20 + (50 * (i/photoBlocks.length)));
+            const b = photoBlocks[i];
+            const metadata = new Blob([JSON.stringify({ name: `photo_${i}.jpg`, parents: [newFolderId] })], {type: 'application/json'});
+            const formData = new FormData();
+            formData.append('metadata', metadata);
+            formData.append('file', b.rawFile);
+            
+            const upRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+              method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}` }, body: formData
+            }).then(r => r.json());
+            
+            b.imgSrc = upRes.id; 
+            delete b.rawFile;
+          }
+          
+          CloudEngine.updateProgress('上傳專案架構檔 (project.json)...', 85);
+          const jsonBlob = new Blob([JSON.stringify(dataToUpload)], {type: 'application/json'});
+          const jsonMeta = new Blob([JSON.stringify({ name: 'project.json', parents: [newFolderId] })], {type: 'application/json'});
+          const jsonForm = new FormData();
+          jsonForm.append('metadata', jsonMeta);
+          jsonForm.append('file', jsonBlob);
+          
+          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}` }, body: jsonForm
+          });
+
+          CloudEngine.updateProgress('上傳完成！', 100);
+          return true;
+        } catch (e) {
+          console.error(e);
+          UtilityEngine.toast("上傳失敗，請檢查權限或資料夾 ID");
+          return false;
+        }
+      },
+
+      listProjects: async (parentFolderId) => {
+        if (CloudEngine.mockMode) {
+           UtilityEngine.toast('模擬模式：讀取測試清單');
+           if(state.cloudProjects.length === 0) state.cloudProjects = [{id:'mock1', name:'(測試) 2026 京都行'}];
+           return state.cloudProjects;
+        }
+        try {
+          await CloudEngine.getToken();
+          const q = encodeURIComponent(`'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+            headers: { 'Authorization': `Bearer ${CloudEngine.token}` }
+          }).then(r => r.json());
+          state.cloudProjects = res.files || [];
+          return state.cloudProjects;
+        } catch (e) {
+          UtilityEngine.toast('讀取失敗，請確認資料夾 ID 與權限');
+          return [];
+        }
+      }
+    };
+
+    // ==========================================
+    // 2. UTILITY ENGINE
+    // ==========================================
+    const UtilityEngine = {
+      uid: (prefix = 'id') => prefix + '_' + (crypto.randomUUID ? crypto.randomUUID().split('-')[0] : Math.random().toString(36).slice(2,9)),
+      deepClone: (obj) => typeof structuredClone === 'function' ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)),
+      clamp: (n, min, max) => Math.max(min, Math.min(max, n)),
+      escapeHtml: (value) => String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])),
+      parseGps: (text) => String(text||'').split(/\n+/).map(line=>line.trim()).filter(Boolean).map(line=>{ const parts=line.split(/[\t, ]+/).filter(Boolean); if(parts.length<3) return null; const lng=Number(parts[parts.length-1]); const lat=Number(parts[parts.length-2]); const label=parts.slice(0,-2).join(' '); if(!Number.isFinite(lat)||!Number.isFinite(lng)) return null; return { label:label||'Point', lat, lng }; }).filter(Boolean),
+      toast: (message) => { const el=document.getElementById('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(UtilityEngine._toastT); UtilityEngine._toastT=setTimeout(()=>el.classList.remove('show'),2100); },
+      ensureScript: (key,url,globalName) => { if(window[globalName]) return Promise.resolve(window[globalName]); if(state.scriptPromises[key]) return state.scriptPromises[key]; state.scriptPromises[key]=new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src=url; s.async=true; s.onload=()=>resolve(window[globalName]); s.onerror=()=>reject(new Error('load failed '+url)); document.head.appendChild(s); }); return state.scriptPromises[key]; }
+    };
+
+    // ==========================================
+    // 3. LAYOUT ENGINE (v4 完整版)
+    // ==========================================
+    const LayoutEngine = {
+      currentPaper: () => PAPER_TYPES.find(p => p.id === state.paperId) || PAPER_TYPES[1],
+      paperColor: () => LayoutEngine.currentPaper().bg || '#FAF8F3',
+      paperInlineStyle: () => `background-color:${LayoutEngine.paperColor()};`,
+      printablePaperBg: () => LayoutEngine.paperColor(),
+      activeSlide: () => state.slides[state.activeIdx],
+      selectedBlock: () => { const slide = LayoutEngine.activeSlide(); return slide && state.selectedId ? slide.blocks.find(b => b.id === state.selectedId) || null : null; },
+      updateBlock: (blockId, patch) => { const slide=LayoutEngine.activeSlide(); const idx=slide.blocks.findIndex(b=>b.id===blockId); if(idx>=0) slide.blocks[idx] = { ...slide.blocks[idx], ...patch }; },
+      updateBlockStyle: (blockId, patch) => { const b=LayoutEngine.activeSlide().blocks.find(x=>x.id===blockId); if(b) b.style = { ...(b.style||{}), ...patch }; },
+      cloneLayout: (key) => { const layout = LAYOUTS[key]; return { id: UtilityEngine.uid('slide'), layoutKey: key, spread: layout.spread, blocks: layout.blocks.map(block => ({ id: UtilityEngine.uid(block.type === 'text' ? 'txt' : block.type === 'map_data' ? 'map' : block.type === 'timeline_data' ? 'tl' : 'img'), imgTransform: block.type === 'photo' ? { scale: 1, panX: 0, panY: 0 } : undefined, ...UtilityEngine.deepClone(block) })) }; },
+      isCoverIndex: (index = state.activeIdx) => index === 0,
+      isBackIndex: (index = state.activeIdx) => index === state.slides.length - 1,
+      bookRole: (index = state.activeIdx) => LayoutEngine.isCoverIndex(index) ? '封面' : LayoutEngine.isBackIndex(index) ? '封底' : '內頁',
+      isFreeformSlide: (slide = LayoutEngine.activeSlide()) => !!slide && slide.layoutKey === 'spread_freeform',
+      maxZIndex: (slide = LayoutEngine.activeSlide()) => Math.max(1, ...slide.blocks.map(b => Number(b.zIndex || 1))),
+      layoutMeta: (slide) => LAYOUTS[slide.layoutKey] || { label: slide.spread ? '自訂跨頁' : '自訂單頁', hint: slide.spread ? '左右頁可混搭單頁模板' : '自訂版型', group: slide.spread ? '跨頁' : '單頁' },
+      getBookPages: () => { const pages=[]; state.slides.forEach((slide,slideIndex)=>{ if(slide.spread) { pages.push({slide,slideIndex,offset:0,label:'左頁'}); pages.push({slide,slideIndex,offset:PAGE_W,label:'右頁'}); } else pages.push({slide,slideIndex,offset:0,label:'單頁'}); }); return pages; },
+      blockBelongsToSide: (block, side) => { const center = (block.x||0) + (block.w||0)/2; return side === 'left' ? center < PAGE_W : center >= PAGE_W; },
+      cloneBlocksForSide: (layoutKey, side) => { const layout=LAYOUTS[layoutKey]; if(!layout || layout.spread) return []; const offset=side==='right'?PAGE_W:0; return layout.blocks.map(block=>({ id:UtilityEngine.uid(block.type==='text'?'txt':block.type==='map_data'?'map':block.type === 'timeline_data' ? 'tl' : 'img'), imgTransform:block.type==='photo'?{scale:1,panX:0,panY:0}:undefined, ...UtilityEngine.deepClone(block), x:(block.x||0)+offset })); }
+    };
+
+    // ==========================================
+    // 4. MAP & TIMELINE ENGINE (v4 完整版)
+    // ==========================================
+    const MapEngine = {
+      renderSimplifiedMapSvg: (block) => {
+        const points = Array.isArray(block.gpsData) ? block.gpsData.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng)) : [];
+        const w = block.w || 540; const h = block.h || 320;
+        if (!points.length) {
+          const grid = `<rect x="0" y="0" width="${w}" height="${h}" fill="#F3F0EA"/><g opacity=".38" stroke="#D8D2C8" stroke-width="1">${Array.from({length:10},(_,i)=>`<line x1="${i*100}" y1="0" x2="${i*100}" y2="${h}"/>`).join('')}${Array.from({length:5},(_,i)=>`<line x1="0" y1="${i*80}" x2="${w}" y2="${i*80}"/>`).join('')}</g><text x="${w/2}" y="${h/2}" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#8F887E">請於右側貼上地名、緯度、經度</text>`;
+          return `<svg class="map-svg" viewBox="0 0 ${w} ${h}">${grid}</svg>`;
+        }
+        const bg = `<rect width="${w}" height="${h}" fill="#F3F0EA"/>`;
+        if (points.length === 1) {
+          return `<svg class="map-svg" viewBox="0 0 ${w} ${h}">${bg}<circle cx="${w/2}" cy="${h/2}" r="6" fill="#4A4A4A"/><text x="${w/2+12}" y="${h/2+4}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#4A4A4A">${UtilityEngine.escapeHtml(points[0].label)}</text></svg>`;
+        }
+        const minLat = Math.min(...points.map(p=>p.lat)), maxLat = Math.max(...points.map(p=>p.lat));
+        const minLng = Math.min(...points.map(p=>p.lng)), maxLng = Math.max(...points.map(p=>p.lng));
+        const pad = 50; const latRange = (maxLat - minLat) || 1; const lngRange = (maxLng - minLng) || 1;
+        const xy = points.map(p => ({
+          ...p,
+          x: pad + ((p.lng - minLng) / lngRange) * (w - pad * 2),
+          y: h - pad - ((p.lat - minLat) / latRange) * (h - pad * 2) 
+        }));
+        const path = xy.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+        const route = `<path d="${path}" fill="none" stroke="#B8B3AA" stroke-width="2" stroke-dasharray="6 6"/>`;
+        const markers = xy.map((p, i) => `<g><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="#fff" stroke="#4A4A4A" stroke-width="2.5"/><text x="${(p.x + 12).toFixed(1)}" y="${(p.y + 4).toFixed(1)}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="600" fill="#4A4A4A">${UtilityEngine.escapeHtml(p.label || `Point ${i + 1}`)}</text></g>`).join('');
+        return `<svg class="map-svg" viewBox="0 0 ${w} ${h}">${bg}${route}${markers}</svg>`;
+      }
+    };
+
+    const TimelineEngine = {
+      renderHtml: (block) => {
+        const lines = (block.csvData || '').split('\n').filter(l => l.trim());
+        const items = lines.map(l => {
+          const parts = l.split(/[,，\t]/);
+          return { time: parts[0]||'', title: parts[1]||'', desc: parts.slice(2).join(',')||'' };
+        });
+        let html = `<div style="position:relative; width:100%; height:100%; padding: 12px 10px 10px 24px; font-family: ui-sans-serif, system-ui, sans-serif;">`;
+        if(items.length > 0) {
+          html += `<div style="position:absolute; left: 10px; top: 20px; bottom: 30px; width: 1.5px; background: #D1CDC4;"></div>`;
+        } else {
+          html += `<div style="color:#B8B3AA; font-size:11px;">請於右側貼上行程資料...</div>`;
+        }
+        items.forEach((item, i) => {
+          html += `<div style="position:relative; margin-bottom: 20px; page-break-inside: avoid;">
+            <div style="position:absolute; left: -19.5px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2.5px solid #5D8FC5; z-index: 2;"></div>
+            <div style="font-size: 11px; color: #8F887E; font-weight: 500; margin-bottom: 3px; letter-spacing: 0.05em;">${UtilityEngine.escapeHtml(item.time)}</div>
+            <div style="font-size: 14px; color: #4A4A4A; font-weight: 600; margin-bottom: 4px; letter-spacing: 0.02em;">${UtilityEngine.escapeHtml(item.title)}</div>
+            ${item.desc ? `<div style="font-size: 11px; color: #756E65; line-height: 1.6;">${UtilityEngine.escapeHtml(item.desc)}</div>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+        return html;
+      }
+    };
+
+    // ==========================================
+    // 5. RENDER ENGINE (v4 完整版 + 雲端 UI 修正)
+    // ==========================================
+    const RenderEngine = {
+      renderAll: () => { RenderEngine.renderTopbar(); RenderEngine.renderThumbs(); RenderEngine.renderCanvas(); RenderEngine.renderInspector(); },
+      renderTopbar: () => {
+        const slide = LayoutEngine.activeSlide(); const layout = LayoutEngine.layoutMeta(slide);
+        document.getElementById('currentTitle').textContent = `${String(state.activeIdx + 1).padStart(2, '0')} / ${layout.label}`;
+        document.getElementById('currentHint').textContent = `　${layout.hint}`;
+        document.getElementById('sizePill').textContent = slide.spread ? '900 × 320' : '450 × 320';
+        document.getElementById('safeLabel').textContent = slide.spread ? '跨頁畫布 / 900 × 320 px' : '單頁畫布 / 450 × 320 px';
+      },
+      renderThumbs: () => {
+        const list = document.getElementById('thumbList'); const paperStyle = LayoutEngine.paperInlineStyle();
+        list.innerHTML = state.slides.map((slide, index) => {
+          const scale = slide.spread ? 180 / SPREAD_W : 90 / PAGE_W; const w = slide.spread ? 180 : 90; const h = PAGE_H * scale;
+          const canDelete = !LayoutEngine.isCoverIndex(index) && !LayoutEngine.isBackIndex(index);
+          const role = LayoutEngine.isCoverIndex(index) ? '封面' : LayoutEngine.isBackIndex(index) ? '封底' : '內頁';
+          return `<div class="thumb ${index === state.activeIdx ? 'active' : ''}" data-action="selectSlide" data-index="${index}">
+            <div class="thumb-meta"><div class="thumb-meta-main"><span>${String(index + 1).padStart(2, '0')}</span><span>${role}</span></div>${canDelete ? `<button class="thumb-delete" title="刪除此頁" data-action="removePageAt" data-index="${index}">🗑</button>` : ''}</div>
+            <div class="thumb-stage" style="width:${w}px;height:${h}px;${paperStyle}"><div class="thumb-inner" style="width:${slide.spread ? SPREAD_W : PAGE_W}px;height:${PAGE_H}px;transform:scale(${scale})">${slide.blocks.map(RenderEngine.renderMiniBlock).join('')}</div>${slide.spread ? '<div class="mini-line"></div>' : ''}</div>
+          </div>`;
+        }).join('');
+      },
+      renderCanvas: () => {
+        const canvas = document.getElementById('canvas'); const slide = LayoutEngine.activeSlide();
+        canvas.className = `canvas ${slide.spread ? 'spread' : 'single'}`;
+        canvas.style.width = `${slide.spread ? SPREAD_W : PAGE_W}px`; canvas.style.height = `${PAGE_H}px`;
+        canvas.style.backgroundColor = LayoutEngine.paperColor();
+        canvas.style.transform = `scale(${CANVAS_SCALE})`;
+        canvas.innerHTML = `${slide.spread ? '<div class="fold-line"></div>' : ''}${slide.blocks.slice().sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(RenderEngine.renderBlock).join('')}`;
+      },
+      renderInspector: () => {
+        const panel = document.getElementById('inspector'); const title = document.getElementById('panelTitle'); const b = LayoutEngine.selectedBlock();
+        title.textContent = b ? '編輯元素' : '頁面設定'; panel.innerHTML = b ? RenderEngine.renderBlockPanel(b) : RenderEngine.renderPagePanel();
+      },
+      photoFrameClass: (block) => block.frame === 'polaroid' ? 'frame-polaroid' : block.frame === 'thin' ? 'frame-thin' : 'frame-none',
+      photoViewportRect: (block) => { if(block.frame==='polaroid') return { x:14, y:14, w:Math.max(12, block.w-28), h:Math.max(12, block.h-62) }; if(block.frame==='thin') return { x:8, y:8, w:Math.max(12, block.w-16), h:Math.max(12, block.h-16) }; return { x:0, y:0, w:block.w, h:block.h }; },
+      cssFromTextStyle: (style, mini = false) => {
+        const ff = style.fontFamily === 'sans-serif' ? 'ui-sans-serif, system-ui, sans-serif' : style.fontFamily === 'monospace' ? 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' : 'ui-serif, "Noto Serif TC", "Songti TC", serif';
+        const vertical = style.verticalAlign === 'center' ? 'center' : style.verticalAlign === 'bottom' ? 'flex-end' : 'flex-start';
+        const bg = style.backgroundColor || 'transparent'; const pad = style.padding || '0px';
+        return [`font-family:${ff}`, `font-size:${mini ? Math.max(5, (style.fontSize || 12)) : (style.fontSize || 12)}px`, `color:${style.color || THEME.text}`, `letter-spacing:${style.letterSpacing || 0}px`, `line-height:${style.lineHeight || 1.5}`, `font-weight:${style.fontWeight || 400}`, `text-align:${style.textAlign || 'left'}`, `text-shadow:${style.textShadow || 'none'}`, `background:${bg}`, `padding:${pad}`, `border-radius:${bg === 'transparent' ? '0' : '2px'}`, `display:flex`, `align-items:${vertical}`, `justify-content:flex-start`].join(';') + ';';
+      },
+      renderMiniBlock: (block) => {
+        const base = `left:${block.x}px;top:${block.y}px;width:${block.w}px;height:${block.h}px;z-index:${block.zIndex || 1};`;
+        if (block.type === 'photo') { const r = RenderEngine.photoViewportRect(block); return `<div class="mini-photo ${RenderEngine.photoFrameClass(block)}" style="${base}"><div class="mini-photo-viewport" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;">${block.imgSrc && !block.imgSrc.startsWith('drive_mock') ? `<img src="${block.imgSrc}" alt="">` : ''}</div></div>`; }
+        if (block.type === 'map_data') return `<div class="mini-map" style="${base}"></div>`;
+        if (block.type === 'timeline_data') return `<div class="mini-timeline" style="${base}"></div>`;
+        if (block.type === 'text') return `<div class="mini-text" style="${base}${RenderEngine.cssFromTextStyle(block.style || {}, true)}">${UtilityEngine.escapeHtml(block.value || '')}</div>`;
+        return '';
+      },
+      renderBlock: (block) => {
+        const selected = block.id === state.selectedId ? 'selected' : ''; const baseStyle = `left:${block.x}px;top:${block.y}px;width:${block.w}px;height:${block.h}px;z-index:${block.zIndex || 1};`;
+        const handles = selected ? '<div class="drag-handle" data-drag-handle="true">✥</div><div class="resize-handle left" data-resize-handle="left"></div><div class="resize-handle right" data-resize-handle="right"></div><div class="resize-handle br" data-resize-handle="br"></div>' : '';
+        if (block.type === 'photo') {
+          const t = block.imgTransform || { scale: 1, panX: 0, panY: 0 }; const r = RenderEngine.photoViewportRect(block); const ratio = block.imgRatio || 1; const isWide = ratio > (r.w / r.h);
+          const imgStyle = `width:${isWide ? 'auto' : '100%'};height:${isWide ? '100%' : 'auto'};min-width:${isWide ? '0' : '100%'};min-height:${isWide ? '100%' : '0'};transform:translate(calc(-50% + ${t.panX || 0}px), calc(-50% + ${t.panY || 0}px)) scale(${t.scale || 1});`;
+          const isFree = LayoutEngine.isFreeformSlide();
+          const photoHandles = (selected && isFree) ? handles : '';
+          return `<div class="block photo ${isFree?'free-photo':''} ${RenderEngine.photoFrameClass(block)} ${selected}" data-caption="${UtilityEngine.escapeHtml(block.frameCaption || '旅行筆記')}" data-block-id="${block.id}" data-type="photo" style="${baseStyle}">${photoHandles}<div class="photo-viewport" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;">${(block.imgSrc && !block.imgSrc.startsWith('drive_mock')) ? `<img src="${block.imgSrc}" alt="" style="${imgStyle}">` : `<div class="placeholder"><div class="icon">📷</div><div>${UtilityEngine.escapeHtml(block.placeholder || '點擊上傳')}</div></div>`}</div></div>`;
+        }
+        if (block.type === 'map_data') return `<div class="block map ${selected}" data-block-id="${block.id}" data-type="map_data" style="${baseStyle}">${MapEngine.renderSimplifiedMapSvg(block)}</div>`;
+        if (block.type === 'timeline_data') return `<div class="block ${selected}" data-block-id="${block.id}" data-type="timeline_data" style="${baseStyle}">${handles}<div style="width:100%;height:100%;overflow:hidden;background:rgba(255,255,255,.4);">${TimelineEngine.renderHtml(block)}</div></div>`;
+        if (block.type === 'text') return `<div class="block text ${selected}" data-block-id="${block.id}" data-type="text" style="${baseStyle}${RenderEngine.cssFromTextStyle(block.style || {})}">${handles}<div class="editable" ${selected ? 'contenteditable="true" spellcheck="false"' : ''}>${UtilityEngine.escapeHtml(block.value || '')}</div></div>`;
+        return '';
+      },
+      renderPagePanel: () => {
+        const slide = LayoutEngine.activeSlide(); const pageCount = LayoutEngine.getBookPages().length; const photoCount = state.slides.flatMap(s => s.blocks).filter(b => b.type === 'photo').length;
+        const locked = LayoutEngine.isCoverIndex() || LayoutEngine.isBackIndex();
+        const singleButtons = Object.entries(LAYOUTS).filter(([key, layout]) => !layout.spread).map(([key, layout]) => `<button class="layout-btn ${slide.layoutKey===key?'active':''} ${false?'disabled':''}" data-action="replaceLayout" data-key="${key}"><span>${layout.label}</span><small>${layout.group}｜${layout.hint}</small></button>`).join('');
+        const spreadButtons = Object.entries(LAYOUTS).filter(([key, layout]) => layout.spread).map(([key, layout]) => `<button class="layout-btn ${slide.layoutKey===key?'active':''} ${locked?'disabled':''}" data-action="replaceLayout" data-key="${key}"><span>${layout.label}</span><small>${layout.group}｜${layout.hint}</small></button>`).join('');
+        const dpiX = Math.round((PAGE_W * PDF_EXPORT_SCALE) / (PRINT_MM_W / 25.4)); const dpiY = Math.round((PAGE_H * PDF_EXPORT_SCALE) / (PRINT_MM_H / 25.4));
+        const customTools = LayoutEngine.isFreeformSlide() ? `<div class="section"><div class="label">自訂畫布工具</div><button class="wide-btn primary" data-action="addFreePhoto">＋ 新增自由相框</button><button class="wide-btn primary" data-action="addCustomText">＋ 新增自訂文字框</button><span class="freeform-note">在「全自訂圖文」中可自由移動照片框與拉伸，其餘版面為固定設計以確保美感。</span></div>` : `<div class="section"><div class="label">自訂畫布</div><button class="wide-btn primary" data-action="addFreeformPage">＋ 新增全自訂圖文跨頁</button><span class="freeform-note">需要完全自由配置照片與文字時，請新增這種頁型。</span></div>`;
+        const singlePageModuleButtons = (side) => Object.entries(LAYOUTS).filter(([key, layout]) => !layout.spread && key !== 'cover' && key !== 'back_cover').map(([key, layout]) => `<button class="layout-btn" data-action="applySingleToSide" data-side="${side}" data-key="${key}"><span>${layout.label}</span><small>${side === 'left' ? '左頁' : '右頁'}｜${layout.hint}</small></button>`).join('');
+
+        // 生成專案選單
+        const projectOptions = state.cloudProjects.length === 0 
+          ? `<option value="">請先讀取專案清單...</option>` 
+          : state.cloudProjects.map(p => `<option value="${p.id}">${UtilityEngine.escapeHtml(p.name)}</option>`).join('');
+
+        return `<div class="section"><div class="label">書籍結構</div><div class="stat-box"><div class="stat"><strong>${state.slides.length}</strong><span>模組</span></div><div class="stat"><strong>${pageCount}</strong><span>A5頁</span></div><div class="stat"><strong>${photoCount}</strong><span>相框</span></div></div><span class="book-warning">目前選取：${LayoutEngine.bookRole()}｜${slide.spread ? '跨頁 900×320' : '單頁 450×320'}。封面與封底固定為單頁；所有內頁固定為跨頁模組。若要做左頁／右頁不同版型，請使用下方的「套用單頁模組至左頁／右頁」。</span></div>
+        <div class="section"><div class="label">紙張底色</div><div class="paper-row">${PAPER_TYPES.map(p => `<button class="paper-btn ${state.paperId === p.id ? 'active' : ''}" data-action="paper" data-id="${p.id}"><div class="paper-swatch" style="background:${p.bg}"></div><span>${p.name}</span><small>${p.detail}</small></button>`).join('')}</div><span class="hint-text">保留固定底色，畫布、翻頁預覽與 PDF 會一致套用目前底色。</span></div>
+        <div class="section"><div class="label">版面模組</div>${locked ? `<div class="module-title">單頁模組 / 450 × 320</div><div class="layout-grid">${singleButtons}</div><span class="hint-text">封面與封底只能使用單頁模組，可再用下方功能上傳整頁設計稿替換。</span>` : `<div class="module-title">跨頁模組 / 900 × 320</div><div class="layout-grid">${spreadButtons}</div><span class="hint-text">內頁版面固定為跨頁。選擇其他跨頁模組會重置目前雙頁內容。</span><div class="module-title">套用單頁模組至左頁</div><div class="layout-grid">${singlePageModuleButtons('left')}</div><div class="module-title">套用單頁模組至右頁</div><div class="layout-grid">${singlePageModuleButtons('right')}</div><span class="hint-text">這會只替換目前跨頁中的左半頁或右半頁。</span>`}</div>
+        ${locked ? `<div class="section"><div class="label">封面與封底圖片</div><button class="wide-btn primary" data-action="fullPageImage">上傳整頁${LayoutEngine.isBackIndex() ? '封底' : '封面'}圖片</button><span class="hint-text">可先用美編軟體做成 450×320 比例，再上傳替換。若配合高解析 PDF，建議設計稿至少 2700×1920 px。</span></div>` : ''}
+        ${customTools}
+        <div class="section"><div class="label">頁面工具</div><button class="wide-btn primary" data-action="addText">＋ 新增文字框</button><div class="tool-row"><button class="wide-btn primary" data-action="addSpreadPage">＋ 新增跨頁</button><button class="wide-btn" data-action="duplicatePage">複製目前模組</button></div><button class="wide-btn danger" data-action="removePage">刪除目前模組</button><span class="hint-text">新增的內頁會插入在封底之前。左側縮圖也提供垃圾桶快速刪除。</span></div>
+        
+        <!-- 雲端與儲存設定區塊 -->
+        <div class="section">
+          <div class="label">雲端與儲存設定 (Google Drive)</div>
+          <div class="field">
+            <label>目標雲端資料夾 ID</label>
+            <input type="text" id="driveFolderId" value="1cj43iqX_NDxkgkGNnHqLz7SZXqyJ12dr" style="font-family:ui-monospace, monospace; font-size:11px; border-radius: 8px;">
+          </div>
+          <button class="wide-btn primary" data-action="openCloudModal" style="margin-bottom:16px;">上傳專案與所有照片至雲端</button>
+          
+          <div class="field">
+            <label>載入雲端專案</label>
+            <div style="display:flex; gap:8px; align-items: center;">
+              <!-- 已優化下拉選單樣式 -->
+              <select id="cloudProjectSelect" style="flex:1;">${projectOptions}</select>
+              <button class="wide-btn slim-btn" data-action="fetchCloudProjects">讀 取</button>
+            </div>
+          </div>
+          <button class="wide-btn dark" data-action="loadCloudProject" style="background:#8F887E; color:#fff; border-color: #8F887E; margin-top:8px;">載入選取的專案</button>
+          
+          ${CloudEngine.mockMode ? `<span class="hint-text" style="color:#A15E5E; margin-top:8px;">目前為模擬模式，未設定 Google Client ID。</span>` : ''}
+        </div>
+        
+        <div class="section"><div class="label">印刷輸出品質</div><div class="quality-card"><strong>A5 landscape / ${PRINT_MM_W} × ${PRINT_MM_H} mm</strong><small>PDF 以單頁 450×320 畫布，使用 ${PDF_EXPORT_SCALE}× 渲染為 ${PAGE_W * PDF_EXPORT_SCALE}×${PAGE_H * PDF_EXPORT_SCALE} px，約 ${dpiX}×${dpiY} DPI。</small></div></div>
+        <div class="section"><div class="label">匯出與分享</div><button class="wide-btn primary" data-action="previewFlip"><span class="export-badge">↔</span>開啟簡約翻頁預覽</button><button class="wide-btn primary" data-action="exportPdf"><span class="export-badge">PDF</span>匯出高解析 PDF</button><button class="wide-btn primary" data-action="downloadFlip"><span class="export-badge">HTML</span>下載翻頁電子書 HTML</button><span class="hint-text">翻頁邏輯：封面單頁 → 內頁雙頁組 → 封底單頁；中間僅保留淡淡分隔線。</span></div>`;
+      },
+      renderBlockPanel: (block) => { if (block.type === 'photo') return RenderEngine.renderPhotoPanel(block); if (block.type === 'text') return RenderEngine.renderTextPanel(block); if (block.type === 'map_data') return RenderEngine.renderMapPanel(block); if (block.type === 'timeline_data') return RenderEngine.renderTimelinePanel(block); return ''; },
+      renderPhotoPanel: (block) => {
+        const t = block.imgTransform || { scale: 1, panX: 0, panY: 0 };
+        const freeControls = LayoutEngine.isFreeformSlide() ? `<div class="section"><div class="label">自訂相框尺寸</div><div class="four-fields"><div class="field"><label>X</label><input type="number" value="${Math.round(block.x)}" data-action="boxX" data-id="${block.id}"></div><div class="field"><label>Y</label><input type="number" value="${Math.round(block.y)}" data-action="boxY" data-id="${block.id}"></div><div class="field"><label>寬 W</label><input type="number" value="${Math.round(block.w)}" data-action="boxW" data-id="${block.id}"></div><div class="field"><label>高 H</label><input type="number" value="${Math.round(block.h)}" data-action="boxH" data-id="${block.id}"></div></div><span class="hint-text">也可以直接拖曳照片框左、右、右下角把手調整範圍。</span></div>` : '';
+        return `<div class="section"><div class="label">相框設定</div><button class="wide-btn primary" data-action="uploadPhoto" data-id="${block.id}">${block.imgSrc ? '更換照片' : '上傳照片'}</button><button class="wide-btn primary" data-action="exifFromPhoto" data-id="${block.id}">＋ 從照片 EXIF 建立資訊標籤</button><div class="field"><label>外框樣式</label><select data-action="frameStyle" data-id="${block.id}"><option value="none" ${!block.frame || block.frame === 'none' ? 'selected' : ''}>無外框</option><option value="thin" ${block.frame === 'thin' ? 'selected' : ''}>白邊細框</option><option value="polaroid" ${block.frame === 'polaroid' ? 'selected' : ''}>拍立得外框</option></select></div><div class="field"><label>拍立得下方標籤</label><input type="text" value="${UtilityEngine.escapeHtml(block.frameCaption || '')}" data-action="frameCaption" data-id="${block.id}" placeholder="例如 DAY 01 / TAIPEI"></div></div>${freeControls}<div class="section"><div class="label">縮放與構圖位置</div><div class="field"><label>照片縮放</label><div class="zoom-control-row"><button data-action="photoZoomOut" data-id="${block.id}">−</button><span>${(t.scale || 1).toFixed(2)}×</span><button data-action="photoZoomIn" data-id="${block.id}">＋</button></div></div><div class="tool-row"><button class="wide-btn" data-action="resetPan" data-id="${block.id}">重置構圖</button><button class="wide-btn danger" data-action="deleteBlock" data-id="${block.id}">刪除相框</button></div><span class="hint-text">已改為按鈕縮放；選取照片後可直接拖曳照片內容微調構圖。</span></div>`;
+      },
+      renderTextPanel: (block) => {
+        const s = block.style || {}; const bgOption = (style) => { const bg = style.backgroundColor || 'transparent'; if (bg === 'rgba(0,0,0,.045)') return 'subtle'; if (bg === 'rgba(0,0,0,.72)') return 'dark'; if (bg === '#FFFFFF') return 'white'; return 'none'; };
+        return `<div class="section"><div class="label">文字內容編輯</div><div class="field"><label>文字內容</label><textarea data-action="textValue" data-id="${block.id}">${UtilityEngine.escapeHtml(block.value || '')}</textarea></div><button class="wide-btn danger" data-action="deleteBlock" data-id="${block.id}">刪除文字框</button></div><div class="section"><div class="label">文字框範圍</div><div class="four-fields"><div class="field"><label>X</label><input type="number" value="${Math.round(block.x)}" data-action="boxX" data-id="${block.id}"></div><div class="field"><label>Y</label><input type="number" value="${Math.round(block.y)}" data-action="boxY" data-id="${block.id}"></div><div class="field"><label>寬 W</label><input type="number" value="${Math.round(block.w)}" data-action="boxW" data-id="${block.id}"></div><div class="field"><label>高 H</label><input type="number" value="${Math.round(block.h)}" data-action="boxH" data-id="${block.id}"></div></div><span class="hint-text">也可直接抓文字框左右藍色把手延伸寬度，換行會即時改變。</span></div><div class="section"><div class="label">字體與排版</div><div class="field"><label>字級</label><div class="range-row"><input type="range" min="6" max="36" step="1" value="${s.fontSize || 12}" data-action="fontSize" data-id="${block.id}"><span>${s.fontSize || 12}</span></div></div><div class="field"><label>字距</label><div class="range-row"><input type="range" min="0" max="8" step=".5" value="${s.letterSpacing || 0}" data-action="letterSpacing" data-id="${block.id}"><span>${s.letterSpacing || 0}</span></div></div><div class="field"><label>行高</label><div class="range-row"><input type="range" min="1" max="2.8" step=".05" value="${s.lineHeight || 1.5}" data-action="lineHeight" data-id="${block.id}"><span>${s.lineHeight || 1.5}</span></div></div><div class="field"><label>字體</label><select data-action="fontFamily" data-id="${block.id}"><option value="serif" ${s.fontFamily === 'serif' ? 'selected' : ''}>明體 / 書籍感</option><option value="sans-serif" ${s.fontFamily === 'sans-serif' ? 'selected' : ''}>黑體 / 標籤感</option><option value="monospace" ${s.fontFamily === 'monospace' ? 'selected' : ''}>等寬 / EXIF</option></select></div><div class="field"><label>文字色彩</label><select data-action="textColor" data-id="${block.id}"><option value="#4A4A4A" ${s.color === '#4A4A4A' ? 'selected' : ''}>墨灰</option><option value="#B8B3AA" ${s.color === '#B8B3AA' ? 'selected' : ''}>淡灰棕</option><option value="#111111" ${s.color === '#111111' ? 'selected' : ''}>黑</option><option value="#FFFFFF" ${s.color === '#FFFFFF' ? 'selected' : ''}>白</option></select></div><div class="field"><label>文字框底色</label><select data-action="textBg" data-id="${block.id}"><option value="none" ${bgOption(s) === 'none' ? 'selected' : ''}>無底色</option><option value="subtle" ${bgOption(s) === 'subtle' ? 'selected' : ''}>微灰底</option><option value="white" ${bgOption(s) === 'white' ? 'selected' : ''}>白底</option><option value="dark" ${bgOption(s) === 'dark' ? 'selected' : ''}>黑底</option></select></div><div class="field"><label>垂直對齊</label><select data-action="verticalAlign" data-id="${block.id}"><option value="top" ${!s.verticalAlign || s.verticalAlign === 'top' ? 'selected' : ''}>置頂</option><option value="center" ${s.verticalAlign === 'center' ? 'selected' : ''}>垂直置中</option><option value="bottom" ${s.verticalAlign === 'bottom' ? 'selected' : ''}>置底</option></select></div><div class="tool-row"><button class="wide-btn" data-action="align" data-id="${block.id}" data-value="left">靠左</button><button class="wide-btn" data-action="align" data-id="${block.id}" data-value="center">置中</button></div></div>`;
+      },
+      renderMapPanel: (block) => {
+        const gpsText = (block.gpsData || []).map(p => `${p.label}\t${p.lat}\t${p.lng}`).join('\n');
+        return `<div class="section"><div class="label">向量地圖資料</div><div class="field"><label>簡化地圖座標，格式：地名　緯度　經度</label><textarea data-action="gpsData" data-id="${block.id}" placeholder="Tokyo Station 35.6812 139.7671\nKyoto 35.0116 135.7681" style="height:120px;">${UtilityEngine.escapeHtml(gpsText)}</textarea></div><button class="wide-btn primary" data-action="sampleGps" data-id="${block.id}">載入測試軌跡</button><span class="hint-text">這是一張自動適應邊界的純向量地圖，能完美支援離線觀看與高畫質 PDF 輸出。</span><button class="wide-btn danger" data-action="deleteBlock" data-id="${block.id}">刪除地圖</button></div>`;
+      },
+      renderTimelinePanel: (block) => {
+        return `<div class="section"><div class="label">時間軸資料</div><div class="field"><label>CSV 行程資料 (時間,標題,說明)</label><textarea data-action="csvData" data-id="${block.id}" style="height:120px;" placeholder="09:00,抵達機場,準備轉車...">${UtilityEngine.escapeHtml(block.csvData)}</textarea></div><span class="hint-text">每一行代表一個時間節點。可以用逗號或 Tab 鍵分隔時間、標題與詳細說明。</span><button class="wide-btn danger" data-action="deleteBlock" data-id="${block.id}">刪除時間軸</button></div>`;
+      }
+    };
+
+    // ==========================================
+    // 6. FLIPBOOK ENGINE (v4 完整版還原)
+    // ==========================================
+    const FlipBookEngine = {
+      renderStaticPage: (page) => {
+        if (!page) return `<div class="a5-page blank-page">空白頁</div>`;
+        const w = page.slide.spread ? SPREAD_W : PAGE_W;
+        return `<div class="a5-page"><div class="a5-inner" style="left:-${page.offset}px;width:${w}px;">${FlipBookEngine.renderStaticSlide(page.slide)}</div></div>`;
+      },
+      renderStaticSlide: (slide) => {
+        const w = slide.spread ? SPREAD_W : PAGE_W; const paper = LayoutEngine.printablePaperBg();
+        return `<div class="canvas ${slide.spread ? 'spread' : 'single'}" style="width:${w}px;height:${PAGE_H}px;${LayoutEngine.paperInlineStyle()};transform:none;box-shadow:none;">${slide.spread ? '<div class="fold-line"></div>' : ''}${slide.blocks.slice().sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(FlipBookEngine.renderStaticBlock).join('')}</div>`;
+      },
+      renderStaticBlock: (block) => {
+        const base = `left:${block.x}px;top:${block.y}px;width:${block.w}px;height:${block.h}px;z-index:${block.zIndex || 1};`;
+        if (block.type === 'photo') {
+          const t = block.imgTransform || { scale: 1, panX: 0, panY: 0 }; const r = RenderEngine.photoViewportRect(block); const ratio = block.imgRatio || 1; const isWide = ratio > (r.w / r.h);
+          const imgStyle = `width:${isWide ? 'auto' : '100%'};height:${isWide ? '100%' : 'auto'};min-width:${isWide ? '0' : '100%'};min-height:${isWide ? '100%' : '0'};transform:translate(calc(-50% + ${t.panX || 0}px), calc(-50% + ${t.panY || 0}px)) scale(${t.scale || 1});`;
+          return `<div class="block photo ${RenderEngine.photoFrameClass(block)}" data-caption="${UtilityEngine.escapeHtml(block.frameCaption || '旅行筆記')}" style="${base}"><div class="photo-viewport" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;">${(block.imgSrc && !block.imgSrc.startsWith('drive_mock')) ? `<img src="${block.imgSrc}" alt="" style="${imgStyle}">` : `<div class="placeholder"><div class="icon">📷</div><div>${UtilityEngine.escapeHtml(block.placeholder || '')}</div></div>`}</div></div>`;
+        }
+        if (block.type === 'map_data') return `<div class="block map" style="${base}">${MapEngine.renderSimplifiedMapSvg(block)}</div>`;
+        if (block.type === 'timeline_data') return `<div class="block" style="${base}">${TimelineEngine.renderHtml(block)}</div>`;
+        if (block.type === 'text') return `<div class="block text" style="${base}${RenderEngine.cssFromTextStyle(block.style || {})}"><div class="editable">${UtilityEngine.escapeHtml(block.value || '')}</div></div>`;
+        return '';
+      },
+      getFlipViews: () => {
+        const pages = LayoutEngine.getBookPages(); if (!pages.length) return [];
+        const views = [{ mode: 'cover', left: null, right: pages[0], label: '封面' }];
+        const last = pages.length - 1;
+        for (let i = 1; i < last; i += 2) views.push({ mode: 'spread', left: pages[i], right: i + 1 < last ? pages[i + 1] : null, label: `內頁 ${i}–${Math.min(i + 1, last - 1)}` });
+        if (last > 0) views.push({ mode: 'back', left: pages[last], right: null, label: '封底' });
+        return views;
+      },
+      openFlipPreview: () => {
+        const pages = LayoutEngine.getBookPages(); const views = FlipBookEngine.getFlipViews();
+        state.flipPairIndex = Math.max(0, views.findIndex(v => (v.left && v.left.slideIndex === state.activeIdx) || (v.right && v.right.slideIndex === state.activeIdx)));
+        document.getElementById('flipModal').classList.remove('hidden'); document.getElementById('flipModal').setAttribute('aria-hidden', 'false'); FlipBookEngine.renderFlipPreview();
+      },
+      closeFlipPreview: () => { document.getElementById('flipModal').classList.add('hidden'); document.getElementById('flipModal').setAttribute('aria-hidden', 'true'); },
+      changeFlip: (delta) => {
+        const views = FlipBookEngine.getFlipViews(); state.flipPairIndex = UtilityEngine.clamp(state.flipPairIndex + delta, 0, Math.max(0, views.length - 1));
+        state.flipTurning = true; FlipBookEngine.renderFlipPreview(); setTimeout(() => { state.flipTurning = false; FlipBookEngine.renderFlipPreview(); }, 390);
+      },
+      renderFlipPreview: () => {
+        const views = FlipBookEngine.getFlipViews(); const view = views[state.flipPairIndex] || views[0]; if (!view) return;
+        const stage = document.getElementById('bookStage'); stage.className = `book-stage book-${view.mode}`;
+        const left = view.left ? FlipBookEngine.renderStaticPage(view.left) : ''; const right = view.right ? FlipBookEngine.renderStaticPage(view.right) : '';
+        stage.innerHTML = `${left}${right}<span class="page-edge-label">${view.label}</span>`;
+        document.getElementById('flipCounter').textContent = `${state.flipPairIndex + 1} / ${views.length}　${view.label}`;
+      }
+    };
+
+    // ==========================================
+    // 7. EXPORT ENGINE (v4 完整版還原)
+    // ==========================================
+    const ExportEngine = {
+      fileToBase64: (file) => new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(file); }),
+      prepareDataForHtmlExport: async () => {
+        const data = UtilityEngine.deepClone(state);
+        for (const slide of data.slides) {
+          for (const block of slide.blocks) {
+            if (block.type === 'photo' && block.imgSrc && block.imgSrc.startsWith('blob:') && block.rawFile) {
+              block.imgSrc = await ExportEngine.fileToBase64(block.rawFile);
+            }
+          }
+        }
+        return data;
+      },
+      exportPdf: async () => {
+        const overlay = document.getElementById('exporting'); overlay.classList.add('show'); overlay.textContent = '載入 PDF 套件中...';
+        try {
+          await UtilityEngine.ensureScript('html2canvas', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
+          await UtilityEngine.ensureScript('jspdf', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'jspdf');
+          if (document.fonts && document.fonts.ready) await document.fonts.ready;
+          const pages = LayoutEngine.getBookPages(); const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [PRINT_MM_W, PRINT_MM_H], compress: true });
+          let first = true; const root = document.createElement('div'); root.style.cssText = 'position:fixed;left:-10000px;top:0;z-index:-1;background:#fff;width:450px;height:320px;'; document.body.appendChild(root);
+          for (let i = 0; i < pages.length; i++) {
+            overlay.textContent = `渲染高解析 PDF 單頁 ${i + 1} / ${pages.length}...`;
+            root.innerHTML = FlipBookEngine.renderStaticPage(pages[i]); const el = root.firstElementChild;
+            const canvas = await window.html2canvas(el, { scale: PDF_EXPORT_SCALE, backgroundColor: LayoutEngine.printablePaperBg(), useCORS: true, allowTaint: false, logging: false, width: PAGE_W, height: PAGE_H, windowWidth: PAGE_W, windowHeight: PAGE_H });
+            const img = canvas.toDataURL('image/jpeg', 0.98);
+            if (!first) pdf.addPage([PRINT_MM_W, PRINT_MM_H], 'landscape');
+            pdf.addImage(img, 'JPEG', 0, 0, PRINT_MM_W, PRINT_MM_H, undefined, 'FAST'); first = false;
+          }
+          root.remove(); overlay.textContent = '下載 PDF 中...'; pdf.save('Travel_Photo_Book_A5_highres.pdf'); UtilityEngine.toast('PDF 已以 A5 單頁順序與 6× 高解析輸出');
+        } catch (err) { console.error(err); UtilityEngine.toast('PDF 匯出失敗，請確認網路可載入 html2canvas/jsPDF'); }
+        finally { overlay.classList.remove('show'); }
+      },
+      downloadFlipHtml: async () => {
+        const overlay = document.getElementById('exporting'); overlay.classList.add('show'); overlay.textContent = '處理圖片記憶體中...';
+        const exportState = await ExportEngine.prepareDataForHtmlExport();
+        const data = JSON.stringify({ slides: exportState.slides, paper: LayoutEngine.paperColor() }).replace(/</g, '\\u003c');
+        const renderer = `function esc(v){return String(v??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}function frameClass(b){return b.frame==='polaroid'?'frame-polaroid':b.frame==='thin'?'frame-thin':'frame-none'}function rect(b){if(b.frame==='polaroid')return{x:14,y:14,w:Math.max(12,b.w-28),h:Math.max(12,b.h-62)};if(b.frame==='thin')return{x:8,y:8,w:Math.max(12,b.w-16),h:Math.max(12,b.h-16)};return{x:0,y:0,w:b.w,h:b.h}}function textCss(s={}){const ff=s.fontFamily==='sans-serif'?'ui-sans-serif,system-ui,sans-serif':s.fontFamily==='monospace'?'ui-monospace,SFMono-Regular,Menlo,monospace':'ui-serif,\\'Noto Serif TC\\',serif';const va=s.verticalAlign==='center'?'center':s.verticalAlign==='bottom'?'flex-end':'flex-start';return ['font-family:'+ff,'font-size:'+(s.fontSize||12)+'px','color:'+(s.color||'#4A4A4A'),'letter-spacing:'+(s.letterSpacing||0)+'px','line-height:'+(s.lineHeight||1.5),'font-weight:'+(s.fontWeight||400),'text-align:'+(s.textAlign||'left'),'text-shadow:'+(s.textShadow||'none'),'background:'+(s.backgroundColor||'transparent'),'padding:'+(s.padding||'0px'),'border-radius:'+(s.backgroundColor?'2px':'0'),'display:flex','align-items:'+va,'justify-content:flex-start'].join(';')+';'}function mapSvg(b){const pts=Array.isArray(b.gpsData)?b.gpsData.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)):[];const w=b.w||540,h=b.h||320,bg='<rect width="'+w+'" height="'+h+'" fill="#F3F0EA"/>';if(!pts.length)return '<svg class="map-svg" viewBox="0 0 '+w+' '+h+'">'+bg+'<text x="'+(w/2)+'" y="'+(h/2)+'" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#8F887E">空白地圖</text></svg>';if(pts.length===1)return '<svg class="map-svg" viewBox="0 0 '+w+' '+h+'">'+bg+'<circle cx="'+(w/2)+'" cy="'+(h/2)+'" r="6" fill="#4A4A4A"/><text x="'+(w/2+12)+'" y="'+(h/2+4)+'" font-family="sans-serif" font-size="11" fill="#4A4A4A">'+esc(pts[0].label)+'</text></svg>';const mnLt=Math.min(...pts.map(p=>p.lat)),mxLt=Math.max(...pts.map(p=>p.lat)),mnLg=Math.min(...pts.map(p=>p.lng)),mxLg=Math.max(...pts.map(p=>p.lng)),pad=50,lr=(mxLt-mnLt)||1,lgr=(mxLg-mnLg)||1;const xy=pts.map(p=>({x:pad+((p.lng-mnLg)/lgr)*(w-pad*2),y:h-pad-((p.lat-mnLt)/lr)*(h-pad*2)}));const pth=xy.map((p,i)=>(i===0?'M':'L')+' '+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');return '<svg class="map-svg" viewBox="0 0 '+w+' '+h+'">'+bg+'<path d="'+pth+'" fill="none" stroke="#B8B3AA" stroke-width="2" stroke-dasharray="6 6"/>'+xy.map((p,i)=>'<g><circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5.5" fill="#fff" stroke="#4A4A4A" stroke-width="2.5"/><text x="'+(p.x+12).toFixed(1)+'" y="'+(p.y+4).toFixed(1)+'" font-family="sans-serif" font-size="11" font-weight="600" fill="#4A4A4A">'+esc(pts[i].label||'Point '+(i+1))+'</text></g>').join('')+'</svg>'}function tlHtml(b){const lns=(b.csvData||'').split('\\n').filter(l=>l.trim()),its=lns.map(l=>{const pts=l.split(/[,，\\t]/);return{time:pts[0]||'',title:pts[1]||'',desc:pts.slice(2).join(',')||''}});let h='<div style="position:relative;width:100%;height:100%;padding:12px 10px 10px 24px;font-family:ui-sans-serif,system-ui,sans-serif;">';if(its.length>0){h+='<div style="position:absolute;left:10px;top:20px;bottom:30px;width:1.5px;background:#D1CDC4;"></div>'}its.forEach(it=>{h+='<div style="position:relative;margin-bottom:20px;page-break-inside:avoid;"><div style="position:absolute;left:-19.5px;top:4px;width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid #5D8FC5;z-index:2;"></div><div style="font-size:11px;color:#8F887E;font-weight:500;margin-bottom:3px;letter-spacing:0.05em;">'+esc(it.time)+'</div><div style="font-size:14px;color:#4A4A4A;font-weight:600;margin-bottom:4px;letter-spacing:0.02em;">'+esc(it.title)+'</div>'+(it.desc?'<div style="font-size:11px;color:#756E65;line-height:1.6;">'+esc(it.desc)+'</div>':'')+'</div>'});h+='</div>';return h}function block(b){const base='left:'+b.x+'px;top:'+b.y+'px;width:'+b.w+'px;height:'+b.h+'px;z-index:'+(b.zIndex||1)+';'; if(b.type==='photo'){const r=rect(b),t=b.imgTransform||{scale:1,panX:0,panY:0},ratio=b.imgRatio||1,wide=ratio>(r.w/r.h);const img='width:'+(wide?'auto':'100%')+';height:'+(wide?'100%':'auto')+';min-width:'+(wide?'0':'100%')+';min-height:'+(wide?'100%':'0')+';transform:translate(calc(-50% + '+(t.panX||0)+'px), calc(-50% + '+(t.panY||0)+'px)) scale('+(t.scale||1)+');';return '<div class="block photo '+frameClass(b)+'" data-caption="'+esc(b.frameCaption||'旅行筆記')+'" style="'+base+'"><div class="photo-viewport" style="left:'+r.x+'px;top:'+r.y+'px;width:'+r.w+'px;height:'+r.h+'px;">'+(b.imgSrc&&!b.imgSrc.startsWith('drive_mock')?'<img src="'+b.imgSrc+'" style="'+img+'">':'')+'</div></div>'} if(b.type==='map_data')return '<div class="block map" style="'+base+'">'+mapSvg(b)+'</div>'; if(b.type==='timeline_data')return '<div class="block" style="'+base+'">'+tlHtml(b)+'</div>'; if(b.type==='text')return '<div class="block text" style="'+base+textCss(b.style||{})+'"><div class="editable">'+esc(b.value||'')+'</div></div>';return ''}function slide(s){const w=s.spread?900:450;return '<div class="canvas '+(s.spread?'spread':'single')+'" style="width:'+w+'px;height:320px;background:'+DATA.paper+';transform:none;box-shadow:none;">'+(s.spread?'<div class="fold-line"></div>':'')+s.blocks.slice().sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(block).join('')+'</div>'}function pages(){const out=[];DATA.slides.forEach((s,i)=>{if(s.spread){out.push({s,offset:0});out.push({s,offset:450});}else out.push({s,offset:0});});return out}function page(p){if(!p)return '<div class="a5 blank">空白頁</div>';const w=p.s.spread?900:450;return '<div class="a5"><div class="inner" style="left:-'+p.offset+'px;width:'+w+'px;">'+slide(p.s)+'</div></div>'}function views(){const ps=pages();if(!ps.length)return[];const out=[{mode:'cover',left:null,right:ps[0],label:'封面'}];const last=ps.length-1;for(let i=1;i<last;i+=2)out.push({mode:'spread',left:ps[i],right:i+1<last?ps[i+1]:null,label:'內頁'});if(last>0)out.push({mode:'back',left:ps[last],right:null,label:'封底'});return out}function render(){const vs=views(),v=vs[idx]||vs[0],st=document.getElementById('stage');st.className='stage '+v.mode;st.innerHTML=(v.left?page(v.left):'')+(v.right?page(v.right):'');document.getElementById('counter').textContent=(idx+1)+' / '+vs.length+' '+v.label;}`;
+        const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Travel Photo Book Flip</title><style>*{box-sizing:border-box}.canvas{position:relative;width:900px;height:320px;background:#FAF8F3;overflow:hidden;user-select:none}.canvas.single{width:450px}.fold-line{position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(0,0,0,.10);z-index:90}.block{position:absolute;outline:0 solid transparent;outline-offset:3px}.block.photo{overflow:visible;background:transparent}.photo-viewport{position:absolute;overflow:hidden;background:rgba(0,0,0,.035)}.photo-viewport img{position:absolute;left:50%;top:50%;display:block;pointer-events:none;transform-origin:center center}.placeholder{height:100%;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#A39C93;border:1px dashed rgba(163,156,147,.45);background:repeating-linear-gradient(-45deg,rgba(255,255,255,.23),rgba(255,255,255,.23) 8px,rgba(0,0,0,.015) 8px,rgba(0,0,0,.015) 16px);font-family:ui-sans-serif,system-ui,sans-serif;font-size:10px;letter-spacing:.12em;text-align:center}.block.text{overflow:visible;white-space:pre-wrap}.block.text .editable{width:100%;outline:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;margin:0}.block.map{overflow:hidden;background:#F3F0EA;border:1px solid rgba(0,0,0,.04);border-radius:4px;}.map-svg{width:100%;height:100%;display:block}.block.photo.frame-thin{background:#fff;box-shadow:0 6px 18px rgba(48,42,35,.12);border:1px solid rgba(0,0,0,.08)}.block.photo.frame-polaroid{background:#fff;box-shadow:0 12px 30px rgba(48,42,35,.20);border:1px solid rgba(0,0,0,.08)}.block.photo.frame-polaroid::after{content:attr(data-caption);position:absolute;left:14px;right:14px;bottom:11px;height:20px;color:#9B948B;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;letter-spacing:.12em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;pointer-events:none}body{margin:0;min-height:100vh;background:#E5E0D8;color:#4A4A4A;font-family:ui-serif,'Noto Serif TC',serif;display:grid;grid-template-rows:auto 1fr auto}header,footer{padding:16px 22px;font-family:ui-sans-serif,system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;color:#756E65}main{display:grid;place-items:center;overflow:auto;padding:24px}.stage{position:relative;display:grid;justify-content:center;align-items:center;gap:0;padding:24px}.stage.cover,.stage.back{grid-template-columns:450px}.stage.spread{grid-template-columns:450px 450px}.stage.spread:after{content:"";position:absolute;left:50%;top:24px;bottom:24px;width:1px;background:rgba(0,0,0,.13)}.a5{width:450px;height:320px;overflow:hidden;position:relative;background:${LayoutEngine.paperColor()};box-shadow:0 12px 30px rgba(34,25,18,.10),inset 0 0 0 1px rgba(0,0,0,.025)}.inner{position:absolute;top:0;height:320px}.blank{display:grid;place-items:center;color:#B8B3AA;font-family:monospace;font-size:10px;letter-spacing:.14em}button{border:1px solid rgba(143,136,126,.28);background:rgba(255,255,255,.58);border-radius:999px;padding:9px 14px;color:#665F56}</style></head><body><header><strong>TRAVEL PHOTO BOOK</strong><span id="counter"></span></header><main><div class="stage" id="stage"></div></main><footer><button id="prev">← 上一頁組</button><span>封面 + 跨頁 + 封底</span><button id="next">下一頁組 →</button></footer><script>const DATA=${data};const PAGE_W=450,PAGE_H=320,SPREAD_W=900;let idx=0;${renderer}document.getElementById('prev').onclick=()=>{idx=Math.max(0,idx-1);render()};document.getElementById('next').onclick=()=>{idx=Math.min(views().length-1,idx+1);render()};render();<\/script></body></html>`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' }); const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'travel_photo_book_flip_book_v5.html'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000); UtilityEngine.toast('已下載翻頁電子書 HTML'); overlay.classList.remove('show');
+      }
+    };
+
+    // ==========================================
+    // 8. APP ENGINE (v4 完整版互動保留)
+    // ==========================================
+    const AppEngine = {
+      manualSave: async () => {
+        const btn = document.getElementById('saveBtn');
+        btn.innerHTML = '儲存中...'; btn.classList.add('saving');
+        try {
+          await DBEngine.save({ slides: state.slides, paperId: state.paperId });
+          UtilityEngine.toast('進度已手動儲存至本機');
+        } catch(e) { UtilityEngine.toast('儲存失敗'); }
+        finally { setTimeout(() => { btn.innerHTML = '手動儲存'; btn.classList.remove('saving'); }, 600); }
+      },
+      openCloudModal: () => {
+        document.getElementById('projectModal').classList.remove('hidden'); document.getElementById('projectModal').setAttribute('aria-hidden', 'false');
+        document.getElementById('projectNameInput').value = ''; document.getElementById('projectNameInput').focus();
+        document.getElementById('uploadProgressArea').classList.add('hidden'); document.getElementById('projectModalBtns').style.display = 'flex';
+      },
+      closeProjectModal: () => { document.getElementById('projectModal').classList.add('hidden'); },
+      confirmCloudUpload: async () => {
+        const name = document.getElementById('projectNameInput').value.trim();
+        if (!name) return UtilityEngine.toast('請輸入專案名稱');
+        const folderId = document.getElementById('driveFolderId').value.trim();
+        if (!folderId) return UtilityEngine.toast('請輸入資料夾 ID');
+
+        document.getElementById('projectModalBtns').style.display = 'none';
+        document.getElementById('uploadProgressArea').classList.remove('hidden');
+        document.getElementById('uploadProgressBar').style.width = '0%';
+        
+        const success = await CloudEngine.uploadProject(folderId, name);
+        if (success) { setTimeout(() => { AppEngine.closeProjectModal(); RenderEngine.renderInspector(); UtilityEngine.toast('專案已成功備份至雲端！'); }, 1000); } 
+        else { document.getElementById('projectModalBtns').style.display = 'flex'; }
+      },
+      fetchCloudProjects: async () => {
+        const folderId = document.getElementById('driveFolderId').value.trim();
+        if(!folderId) return UtilityEngine.toast('無資料夾 ID');
+        UtilityEngine.toast('讀取中...'); await CloudEngine.listProjects(folderId); RenderEngine.renderInspector(); UtilityEngine.toast('讀取完成');
+      },
+      handleAction: (el, e) => {
+        const action = el.dataset.action; const id = el.dataset.id;
+        if (action === 'manualSave') AppEngine.manualSave();
+        if (action === 'selectSlide') { state.activeIdx = Number(el.dataset.index); state.selectedId = null; RenderEngine.renderAll(); }
+        if (action === 'paper') { state.paperId = el.dataset.id; document.documentElement.style.setProperty('--paper', LayoutEngine.paperColor()); RenderEngine.renderAll(); }
+        if (action === 'replaceLayout') { AppEngine.replaceLayout(el.dataset.key); }
+        if (action === 'applySingleToSide') { AppEngine.applySingleToSide(el.dataset.side, el.dataset.key); }
+        if (action === 'addText') AppEngine.addTextBlock();
+        if (action === 'addCustomText') AppEngine.addTextBlock('點擊輸入文字...', 540, 72, { fontSize: 12, letterSpacing: 1, color: '#4A4A4A', fontFamily: 'serif', lineHeight: 1.7, verticalAlign: 'top' }, 240, 54);
+        if (action === 'addSpreadPage') { const insertAt = Math.max(1, state.slides.length - 1); state.slides.splice(insertAt, 0, LayoutEngine.cloneLayout('spread_full_bleed')); state.activeIdx = insertAt; state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast('已新增滿版跨頁模組'); }
+        if (action === 'addFreeformPage') { const insertAt = Math.max(1, state.slides.length - 1); state.slides.splice(insertAt, 0, LayoutEngine.cloneLayout('spread_freeform')); state.activeIdx = insertAt; state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast('已新增「全自訂圖文」跨頁'); }
+        if (action === 'addFreePhoto') AppEngine.addFreePhotoBlock();
+        if (action === 'duplicatePage') { if (LayoutEngine.isCoverIndex() || LayoutEngine.isBackIndex()) return UtilityEngine.toast('封面與封底為固定結構'); const clone = UtilityEngine.deepClone(LayoutEngine.activeSlide()); clone.id = UtilityEngine.uid('slide'); clone.blocks = clone.blocks.map(b => ({ ...b, id: UtilityEngine.uid(b.type === 'text' ? 'txt' : b.type === 'map_data' ? 'map' : b.type === 'timeline_data' ? 'tl' : 'img') })); state.slides.splice(Math.min(state.activeIdx + 1, state.slides.length - 1), 0, clone); state.activeIdx++; state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast('已複製目前模組'); }
+        if (action === 'removePageAt') { if (e) e.stopPropagation(); AppEngine.removePageAt(Number(el.dataset.index)); }
+        if (action === 'removePage') AppEngine.removePageAt(state.activeIdx);
+        if (action === 'fullPageImage') { const slide = LayoutEngine.activeSlide(); if (slide.spread) return UtilityEngine.toast('整頁圖片替換只適用單頁模組'); let b = slide.blocks.find(x => x.type === 'photo' && x.x === 0 && x.y === 0 && x.w === PAGE_W && x.h === PAGE_H); if (!b) { b = { id: UtilityEngine.uid('img'), type: 'photo', x: 0, y: 0, w: PAGE_W, h: PAGE_H, zIndex: 0, placeholder: '整頁圖片 / 450×320', imgTransform: { scale: 1, panX: 0, panY: 0 } }; slide.blocks.unshift(b); } state.selectedId = b.id; RenderEngine.renderAll(); state.uploadTargetId = b.id; document.getElementById('photoInput').click(); }
+        if (action === 'previewFlip') FlipBookEngine.openFlipPreview();
+        if (action === 'closeFlip') FlipBookEngine.closeFlipPreview();
+        if (action === 'prevFlip') FlipBookEngine.changeFlip(-1);
+        if (action === 'nextFlip') FlipBookEngine.changeFlip(1);
+        if (action === 'exportPdf') ExportEngine.exportPdf();
+        if (action === 'downloadFlip') ExportEngine.downloadFlipHtml();
+        if (action === 'uploadPhoto') { state.uploadTargetId = id; document.getElementById('photoInput').click(); }
+        if (action === 'exifFromPhoto') AppEngine.addExifLabel(id, true);
+        if (action === 'resetPan') { LayoutEngine.updateBlock(id, { imgTransform: { scale: 1, panX: 0, panY: 0 } }); RenderEngine.renderCanvas(); RenderEngine.renderInspector(); RenderEngine.renderThumbs(); }
+        if (action === 'deleteBlock') { const s = LayoutEngine.activeSlide(); s.blocks = s.blocks.filter(b => b.id !== id); state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast('已刪除元素'); }
+        if (action === 'align') { LayoutEngine.updateBlockStyle(id, { textAlign: el.dataset.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'sampleGps') { LayoutEngine.updateBlock(id, { gpsData: UtilityEngine.parseGps('Tokyo Station 35.6812 139.7671\nHakone 35.2324 139.1069\nKyoto 35.0116 135.7681\nOsaka 34.6937 135.5023') }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'photoZoomIn') AppEngine.adjustPhotoZoom(id, 0.05);
+        if (action === 'photoZoomOut') AppEngine.adjustPhotoZoom(id, -0.05);
+        if (action === 'openCloudModal') AppEngine.openCloudModal();
+        if (action === 'closeProjectModal') AppEngine.closeProjectModal();
+        if (action === 'confirmCloudUpload') AppEngine.confirmCloudUpload();
+        if (action === 'fetchCloudProjects') AppEngine.fetchCloudProjects();
+        if (action === 'loadCloudProject') { if(CloudEngine.mockMode) UtilityEngine.toast('模擬模式：無法真實載入檔案'); else UtilityEngine.toast('開始從 Google Drive 載入專案資料...'); }
+      },
+      handleInput: (el, e) => {
+        const action = el.dataset.action; const id = el.dataset.id;
+        if (action === 'textValue') { LayoutEngine.updateBlock(id, { value: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'csvData') { LayoutEngine.updateBlock(id, { csvData: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'frameStyle') { LayoutEngine.updateBlock(id, { frame: el.value === 'none' ? undefined : el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'frameCaption') { LayoutEngine.updateBlock(id, { frameCaption: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (['fontSize', 'letterSpacing', 'lineHeight'].includes(action)) { LayoutEngine.updateBlockStyle(id, { [action]: Number(el.value) }); RenderEngine.renderCanvas(); RenderEngine.renderInspector(); RenderEngine.renderThumbs(); }
+        if (action === 'fontFamily') { LayoutEngine.updateBlockStyle(id, { fontFamily: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'textColor') { LayoutEngine.updateBlockStyle(id, { color: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'verticalAlign') { LayoutEngine.updateBlockStyle(id, { verticalAlign: el.value }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'textBg') AppEngine.setTextBackground(id, el.value);
+        if (['boxX', 'boxY', 'boxW', 'boxH'].includes(action)) { const keyMap = { boxX: 'x', boxY: 'y', boxW: 'w', boxH: 'h' }; LayoutEngine.updateBlock(id, { [keyMap[action]]: Number(el.value) }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+        if (action === 'gpsData') { LayoutEngine.updateBlock(id, { gpsData: UtilityEngine.parseGps(el.value) }); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); }
+      },
+      setTextBackground: (id, value) => { const patch = value === 'subtle' ? { backgroundColor: 'rgba(0,0,0,.045)', padding: '4px 8px' } : value === 'dark' ? { backgroundColor: 'rgba(0,0,0,.72)', padding: '4px 8px', color: '#FFFFFF' } : value === 'white' ? { backgroundColor: '#FFFFFF', padding: '4px 8px' } : { backgroundColor: 'transparent', padding: '0px' }; LayoutEngine.updateBlockStyle(id, patch); RenderEngine.renderCanvas(); RenderEngine.renderThumbs(); },
+      replaceLayout: (key) => { if (!LAYOUTS[key]) return; if (LayoutEngine.isCoverIndex() || LayoutEngine.isBackIndex()) { if (LAYOUTS[key].spread) return UtilityEngine.toast('封面與封底只能使用單頁模組'); } else if (!LAYOUTS[key].spread) return UtilityEngine.toast('內頁固定為跨頁模組'); const oldId = LayoutEngine.activeSlide().id; const s = LayoutEngine.cloneLayout(key); s.id = oldId; state.slides[state.activeIdx] = s; state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast(`已替換為「${LAYOUTS[key].label}」`); },
+      applySingleToSide: (side, key) => { if (LayoutEngine.isCoverIndex() || LayoutEngine.isBackIndex()) return UtilityEngine.toast('此功能只適用於內頁'); const slide = LayoutEngine.activeSlide(); if (!slide.spread) return UtilityEngine.toast('目前頁不是跨頁模組'); const keep = slide.blocks.filter(block => !LayoutEngine.blockBelongsToSide(block, side)); const applied = LayoutEngine.cloneBlocksForSide(key, side); slide.blocks = [...keep, ...applied].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)); slide.layoutKey = `spread_custom_${side}_${key}`; state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast(`已套用到${side === 'left' ? '左頁' : '右頁'}`); },
+      removePageAt: (index) => { if (LayoutEngine.isCoverIndex(index) || LayoutEngine.isBackIndex(index)) return UtilityEngine.toast('封面與封底不可刪除'); if (state.slides.length <= 2) return UtilityEngine.toast('至少需要保留封面與封底'); state.slides.splice(index, 1); if (state.activeIdx === index) state.activeIdx = Math.max(1, Math.min(index, state.slides.length - 2)); else if (state.activeIdx > index) state.activeIdx--; state.selectedId = null; RenderEngine.renderAll(); },
+      addFreePhotoBlock: () => { if (!LayoutEngine.isFreeformSlide()) return UtilityEngine.toast('照片框自由拉伸只開放在「全自訂圖文」'); const slide = LayoutEngine.activeSlide(); const b = { id: UtilityEngine.uid('img'), type: 'photo', x: 90, y: 62, w: 220, h: 150, zIndex: LayoutEngine.maxZIndex() + 1, freeFrame: true, placeholder: '新增照片框 / 點擊上傳', imgTransform: { scale: 1, panX: 0, panY: 0 } }; slide.blocks.push(b); state.selectedId = b.id; RenderEngine.renderAll(); UtilityEngine.toast('已新增自由照片框'); },
+      addTextBlock: (text, x, y, style, w, h) => { const slide = LayoutEngine.activeSlide(); const b = { id: UtilityEngine.uid('txt'), type: 'text', x: x ?? (slide.spread ? 520 : 70), y: y ?? 70, w: w ?? 250, h: h ?? 42, zIndex: 8, value: text || '點擊輸入文字...', style: style || { fontSize: 12, letterSpacing: 1, color: '#4A4A4A', fontFamily: 'serif', lineHeight: 1.7, verticalAlign: 'top' } }; slide.blocks.push(b); state.selectedId = b.id; RenderEngine.renderAll(); return b; },
+      adjustPhotoZoom: (id, delta) => { const b = LayoutEngine.activeSlide().blocks.find(x => x.id === id); if (!b) return; const t = b.imgTransform || { scale: 1, panX: 0, panY: 0 }; const next = UtilityEngine.clamp(Number((Number(t.scale || 1) + delta).toFixed(2)), 1, 2.4); LayoutEngine.updateBlock(id, { imgTransform: { ...t, scale: next } }); RenderEngine.renderCanvas(); RenderEngine.renderInspector(); RenderEngine.renderThumbs(); },
+      handlePhotoFile: async (e) => {
+        const file = e.target.files && e.target.files[0]; const id = state.uploadTargetId; e.target.value = ''; if (!file || !id) return;
+        UtilityEngine.toast('讀取照片與 EXIF 中...');
+        const exifInfo = await AppEngine.parseExifInfo(file).catch(() => null);
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          LayoutEngine.updateBlock(id, { imgSrc: objectUrl, rawFile: file, imgRatio: img.width / img.height, imgTransform: { scale: 1, panX: 0, panY: 0 }, exifInfo });
+          state.selectedId = id; RenderEngine.renderAll();
+          if (exifInfo && exifInfo.label) AppEngine.addExifLabel(id, false);
+          UtilityEngine.toast(exifInfo && exifInfo.label ? '照片已放入，並自動建立 EXIF 標籤' : '照片已放入；未讀到可用 EXIF');
+          e.target.value = '';
+        };
+        img.src = objectUrl;
+      },
+      parseExifInfo: async (file) => {
+        await UtilityEngine.ensureScript('exifr', 'https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js', 'exifr'); if (!window.exifr) return null;
+        const exif = await window.exifr.parse(file, { gps: true, translateValues: false, reviveValues: true }); if (!exif) return null;
+        const formatExifDate = (v) => { if (!v) return ''; if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}.${String(v.getMonth() + 1).padStart(2, '0')}.${String(v.getDate()).padStart(2, '0')}`; const s = String(v); const m = s.match(/(\d{4})[:\-](\d{2})[:\-](\d{2})/); return m ? `${m[1]}.${m[2]}.${m[3]}` : ''; };
+        const formatNumber = (v) => { if (v == null) return ''; const n = Number(v); if (!Number.isFinite(n)) return ''; return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ''); };
+        const formatShutter = (v) => { if (v == null) return ''; const n = Number(v); if (!Number.isFinite(n) || n <= 0) return ''; return n < 1 ? `1/${Math.round(1 / n)}s` : `${n.toFixed(1).replace(/\.0$/, '')}s`; };
+        const date = formatExifDate(exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate); const focal = formatNumber(exif.FocalLength); const fnum = formatNumber(exif.FNumber || exif.ApertureValue); const shutter = formatShutter(exif.ExposureTime || exif.ShutterSpeedValue); const iso = exif.ISO || exif.ISOSpeedRatings; const gps = (Number.isFinite(exif.latitude) && Number.isFinite(exif.longitude)) ? `GPS ${exif.latitude.toFixed(4)}, ${exif.longitude.toFixed(4)}` : '';
+        const parts = [date, gps, focal ? `${focal}mm` : '', fnum ? `f/${fnum}` : '', shutter, iso ? `ISO ${iso}` : ''].filter(Boolean);
+        return { raw: exif, label: parts.join('  ▋  ') };
+      },
+      addExifLabel: (photoId, manual = false) => {
+        const b = LayoutEngine.activeSlide().blocks.find(x => x.id === photoId); if (!b) return;
+        if (!b.exifInfo || !b.exifInfo.label) { if (manual) UtilityEngine.toast('尚未讀到可用 EXIF；請更換含 EXIF 的原始照片'); return null; }
+        const y = Math.min(PAGE_H - 22, Math.max(2, b.y + b.h + 7)); const x = UtilityEngine.clamp(b.x, 0, (LayoutEngine.activeSlide().spread ? SPREAD_W : PAGE_W) - 260);
+        AppEngine.addTextBlock(b.exifInfo.label, x, y, { fontSize: 7.5, letterSpacing: 1.4, color: '#4A4A4A', fontFamily: 'monospace', lineHeight: 1.4, backgroundColor: 'transparent', padding: '0px', verticalAlign: 'top' }, Math.min(330, (LayoutEngine.activeSlide().spread ? SPREAD_W : PAGE_W) - x - 8), 18); return true;
+      },
+      beginMoveText: (e, blockEl) => { e.preventDefault(); const id = blockEl.dataset.blockId; const b = LayoutEngine.activeSlide().blocks.find(x => x.id === id); if (!b) return; state.moveState = { id, blockEl, startX: e.clientX, startY: e.clientY, x: b.x, y: b.y }; },
+      moveText: (e) => { const m = state.moveState; const dx = (e.clientX - m.startX) / CANVAS_SCALE; const dy = (e.clientY - m.startY) / CANVAS_SCALE; const nx = UtilityEngine.clamp(m.x + dx, -20, (LayoutEngine.activeSlide().spread ? SPREAD_W : PAGE_W) - 20); const ny = UtilityEngine.clamp(m.y + dy, -20, PAGE_H - 10); LayoutEngine.updateBlock(m.id, { x: Math.round(nx), y: Math.round(ny) }); m.blockEl.style.left = `${Math.round(nx)}px`; m.blockEl.style.top = `${Math.round(ny)}px`; RenderEngine.renderThumbs(); },
+      beginResizeText: (e, blockEl, handle) => { e.preventDefault(); e.stopPropagation(); const id = blockEl.dataset.blockId; const b = LayoutEngine.activeSlide().blocks.find(x => x.id === id); if (!b) return; state.resizeState = { id, blockEl, handle, startX: e.clientX, startY: e.clientY, x: b.x, y: b.y, w: b.w, h: b.h }; },
+      resizeText: (e) => { const r = state.resizeState; const dx = (e.clientX - r.startX) / CANVAS_SCALE; const dy = (e.clientY - r.startY) / CANVAS_SCALE; let nx = r.x, nw = r.w, nh = r.h; if (r.handle === 'right' || r.handle === 'br') nw = Math.max(24, r.w + dx); if (r.handle === 'left') { nx = r.x + dx; nw = Math.max(24, r.w - dx); if (nw === 24) nx = r.x + r.w - 24; } if (r.handle === 'br') nh = Math.max(16, r.h + dy); LayoutEngine.updateBlock(r.id, { x: Math.round(nx), w: Math.round(nw), h: Math.round(nh) }); r.blockEl.style.left = `${Math.round(nx)}px`; r.blockEl.style.width = `${Math.round(nw)}px`; r.blockEl.style.height = `${Math.round(nh)}px`; RenderEngine.renderThumbs(); },
+      beginPanPhoto: (e, blockEl, block) => { e.preventDefault(); const img = blockEl.querySelector('img'); const t = block.imgTransform || { scale: 1, panX: 0, panY: 0 }; state.panState = { id: block.id, img, startX: e.clientX, startY: e.clientY, panX: t.panX || 0, panY: t.panY || 0, scale: t.scale || 1 }; },
+      panPhoto: (e) => { const p = state.panState; const dx = (e.clientX - p.startX) / CANVAS_SCALE; const dy = (e.clientY - p.startY) / CANVAS_SCALE; const nx = Math.round(p.panX + dx), ny = Math.round(p.panY + dy); LayoutEngine.updateBlock(p.id, { imgTransform: { scale: p.scale, panX: nx, panY: ny } }); if (p.img) p.img.style.transform = `translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px)) scale(${p.scale})`; },
+      bindGlobalEvents: () => {
+        if (state.eventsBound) return; state.eventsBound = true;
+        document.getElementById('photoInput').addEventListener('change', AppEngine.handlePhotoFile);
+        document.body.addEventListener('click', (e) => { const actionEl = e.target.closest('[data-action]'); if (actionEl) return AppEngine.handleAction(actionEl, e); const blockEl = e.target.closest('[data-block-id]'); if (blockEl) { e.stopPropagation(); const id = blockEl.dataset.blockId; const b = LayoutEngine.activeSlide().blocks.find(x => x.id === id); state.selectedId = id; RenderEngine.renderAll(); if (b && b.type === 'photo' && !b.imgSrc && !b.imgSrc?.startsWith('drive_mock')) { state.uploadTargetId = id; document.getElementById('photoInput').click(); } return; } if (e.target.id === 'canvas') { state.selectedId = null; RenderEngine.renderAll(); } });
+        document.body.addEventListener('input', (e) => { const editable = e.target.closest('.editable[contenteditable="true"]'); if (editable) { const blockEl = editable.closest('[data-block-id]'); const b = LayoutEngine.activeSlide().blocks.find(x => x.id === blockEl.dataset.blockId); if (b) { b.value = editable.innerText; RenderEngine.renderThumbs(); } return; } const el = e.target.closest('[data-action]'); if (el) AppEngine.handleInput(el, e); });
+        document.body.addEventListener('change', (e) => { const el = e.target.closest('[data-action]'); if (el) AppEngine.handleInput(el, e); });
+        document.body.addEventListener('pointerdown', (e) => { const resize = e.target.closest('[data-resize-handle]'); if (resize) return AppEngine.beginResizeText(e, resize.closest('[data-block-id]'), resize.dataset.resizeHandle); const handle = e.target.closest('[data-drag-handle]'); if (handle) return AppEngine.beginMoveText(e, handle.closest('[data-block-id]')); const blockEl = e.target.closest('[data-block-id]'); if (!blockEl) return; const b = LayoutEngine.activeSlide().blocks.find(x => x.id === blockEl.dataset.blockId); if (b && b.type === 'photo' && b.imgSrc && state.selectedId === b.id && !b.imgSrc.startsWith('drive_mock')) AppEngine.beginPanPhoto(e, blockEl, b); });
+        document.addEventListener('pointermove', (e) => { if (state.moveState) AppEngine.moveText(e); if (state.panState) AppEngine.panPhoto(e); if (state.resizeState) AppEngine.resizeText(e); });
+        document.addEventListener('pointerup', () => { if (state.moveState || state.panState || state.resizeState) { state.moveState = null; state.panState = null; state.resizeState = null; RenderEngine.renderAll(); } });
+        document.addEventListener('keydown', (e) => { const isTyping = e.target && (e.target.matches('input, textarea, [contenteditable="true"]') || e.target.closest('[contenteditable="true"]')); if ((e.key === 'Backspace' || e.key === 'Delete') && state.selectedId && !isTyping) { const s = LayoutEngine.activeSlide(); s.blocks = s.blocks.filter(b => b.id !== state.selectedId); state.selectedId = null; RenderEngine.renderAll(); UtilityEngine.toast('已刪除元素'); } if (e.key === 'Escape') { state.selectedId = null; RenderEngine.renderAll(); } });
+      }
+    };
+
+    async function bootstrapApp() {
+      try {
+        const savedState = await DBEngine.load();
+        if (savedState && savedState.slides && savedState.slides.length > 0) {
+          for (const slide of savedState.slides) {
+            for (const block of slide.blocks) {
+              if (block.type === 'photo' && block.rawFile) { block.imgSrc = URL.createObjectURL(block.rawFile); }
+            }
+          }
+          Object.assign(state, savedState);
+          delete state.paperTextureSrc;
+          if (!PAPER_TYPES.some(p => p.id === state.paperId)) state.paperId = 'dowling';
+        } else {
+          state.slides = [ LayoutEngine.cloneLayout('cover'), LayoutEngine.cloneLayout('spread_full_bleed'), LayoutEngine.cloneLayout('spread_cinematic'), LayoutEngine.cloneLayout('spread_three_five'), LayoutEngine.cloneLayout('spread_map'), LayoutEngine.cloneLayout('spread_polaroid_wall'), LayoutEngine.cloneLayout('back_cover') ];
+        }
+      } catch (e) {
+        state.slides = [ LayoutEngine.cloneLayout('cover'), LayoutEngine.cloneLayout('spread_full_bleed'), LayoutEngine.cloneLayout('spread_cinematic'), LayoutEngine.cloneLayout('back_cover') ];
+      }
+      
+      state.activeIdx = 0; state.selectedId = null;
+      document.documentElement.style.setProperty('--paper', LayoutEngine.paperColor());
+      AppEngine.bindGlobalEvents();
+      RenderEngine.renderAll();
+    }
+
+    bootstrapApp();
+  </script>
+</body>
+</html>
