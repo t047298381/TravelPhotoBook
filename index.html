@@ -285,7 +285,7 @@
           <div id="canvas" class="canvas"></div>
         </div>
       </div>
-      <div class="bottom-hint">v5：完整保留 v4 所有功能 (包含 PDF/HTML 匯出、時間軸、EXIF)，並新增雲端專案儲存支援。</div>
+      <div class="bottom-hint">v5：完整保留 v4 所有功能 (包含 PDF/HTML 匯出、時間軸、EXIF)，並新增雲端專案儲存與讀取支援。</div>
     </main>
     <aside class="inspector">
       <div class="panel-head"><h2 id="panelTitle">頁面設定</h2></div>
@@ -329,7 +329,6 @@
     // ==========================================
     // 0. CONFIGURATION & CONSTANTS
     // ==========================================
-    // ⭐ 請在這裡填入您的 Google Client ID，才能正式連線！
     const GOOGLE_CLIENT_ID = '1065286404116-urog6fo7n02lqekhk9meuh74as58adi8.apps.googleusercontent.com'; 
 
     const PAGE_W = 450, PAGE_H = 320, PRINT_MM_W = 210, PRINT_MM_H = 148, PDF_EXPORT_SCALE = 6, SPREAD_W = 900, CANVAS_SCALE = 1.08;
@@ -339,7 +338,7 @@
       { id:'dowling', name:'道林紙', detail:'米白，預設書頁感', bg:'#FAF8F3' },
       { id:'sunlight', name:'沐光紙', detail:'暖黃，旅行手札感', bg:'#F5F0EA' }
     ];
-    // v4 完整 Layouts (不再省略)
+    // v4 完整 Layouts
     const LAYOUTS = {
       cover: { label:'封面', spread:false, hint:'建議圖片尺寸：400 × 250', group:'單頁', blocks:[
         { type:'photo', x:60, y:50, w:330, h:170, zIndex:1, placeholder:'封面大圖 / 400×250' },
@@ -450,115 +449,162 @@
     };
 
     // ==========================================
-    // 1.5 CLOUD ENGINE (Google Drive API / Mock)
+    // 1.5 CLOUD ENGINE (Google Drive API)
     // ==========================================
     const CloudEngine = {
       token: null,
-      mockMode: GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE',
       
       getToken: () => new Promise((resolve, reject) => {
-        if (CloudEngine.mockMode) return resolve('MOCK_TOKEN');
         const client = google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/drive.file',
+          // ⚠️ 解除封印：從 drive.file 改為完整 drive 權限，才能讀寫非本網頁建立的資料夾
+          scope: 'https://www.googleapis.com/auth/drive',
           callback: (res) => { if (res.access_token) { CloudEngine.token = res.access_token; resolve(res.access_token); } else reject('Auth Error'); }
         });
         client.requestAccessToken();
       }),
       
       updateProgress: (text, percent) => {
-        document.getElementById('uploadStatusText').textContent = text;
-        document.getElementById('uploadProgressBar').style.width = `${percent}%`;
+        const txtEl = document.getElementById('uploadStatusText');
+        const barEl = document.getElementById('uploadProgressBar');
+        if (txtEl) txtEl.textContent = text;
+        if (barEl) barEl.style.width = `${percent}%`;
       },
 
       uploadProject: async (parentFolderId, projectName) => {
-        CloudEngine.updateProgress('正在驗證身份...', 10);
+        CloudEngine.updateProgress('正在驗證身份...', 5);
         await CloudEngine.getToken();
         
+        // 為了避免直接修改到當前網頁狀態導致圖片破圖，我們把要上傳的照片任務獨立抓出來
         const dataToUpload = UtilityEngine.deepClone({ slides: state.slides, paperId: state.paperId });
-        let photoBlocks = [];
-        dataToUpload.slides.forEach(slide => slide.blocks.forEach(b => { if (b.type === 'photo' && b.rawFile) photoBlocks.push(b); }));
+        let photoUploadTasks = [];
+        state.slides.forEach((slide, sIdx) => {
+          slide.blocks.forEach((block, bIdx) => {
+            if (block.type === 'photo' && block.rawFile) {
+              photoUploadTasks.push({ rawFile: block.rawFile, targetBlock: dataToUpload.slides[sIdx].blocks[bIdx] });
+            }
+          });
+        });
         
-        if (CloudEngine.mockMode) {
-          CloudEngine.updateProgress('建立專案資料夾...', 30);
-          await new Promise(r => setTimeout(r, 800));
-          for(let i=0; i<photoBlocks.length; i++) {
-            CloudEngine.updateProgress(`上傳照片 (${i+1}/${photoBlocks.length})...`, 30 + (40 * (i/photoBlocks.length)));
-            await new Promise(r => setTimeout(r, 600)); 
-            photoBlocks[i].imgSrc = `drive_mock_id_${Math.random()}`; 
-            delete photoBlocks[i].rawFile;
-          }
-          CloudEngine.updateProgress('上傳專案架構檔 (project.json)...', 80);
-          await new Promise(r => setTimeout(r, 800));
-          CloudEngine.updateProgress('上傳完成！', 100);
-          state.cloudProjects.push({ id: `mock_proj_${Date.now()}`, name: projectName });
-          return true;
-        }
-
         try {
-          CloudEngine.updateProgress('建立專案資料夾...', 20);
+          // 1. 建立專案資料夾
+          CloudEngine.updateProgress('建立專案資料夾...', 15);
           const folderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: projectName, mimeType: 'application/vnd.google-apps.folder', parents: [parentFolderId] })
-          }).then(r => r.json());
+          });
+          if (!folderRes.ok) throw new Error('無法建立資料夾，請確認您的目標資料夾 ID 與權限正確。');
+          const newFolderId = (await folderRes.json()).id;
           
-          const newFolderId = folderRes.id;
-          
-          for(let i=0; i<photoBlocks.length; i++) {
-            CloudEngine.updateProgress(`上傳照片 (${i+1}/${photoBlocks.length})...`, 20 + (50 * (i/photoBlocks.length)));
-            const b = photoBlocks[i];
-            const metadata = new Blob([JSON.stringify({ name: `photo_${i}.jpg`, parents: [newFolderId] })], {type: 'application/json'});
-            const formData = new FormData();
-            formData.append('metadata', metadata);
-            formData.append('file', b.rawFile);
+          // 2. 兩階段上傳照片 (更穩定，避免 Multipart FormData 問題)
+          for(let i=0; i<photoUploadTasks.length; i++) {
+            CloudEngine.updateProgress(`上傳照片 (${i+1}/${photoUploadTasks.length})...`, 15 + (65 * (i/photoUploadTasks.length)));
+            const task = photoUploadTasks[i];
             
-            const upRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-              method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}` }, body: formData
-            }).then(r => r.json());
+            // 步驟A：建立空檔案取得 ID
+            const fileMetaRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+              method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: `photo_${i}.jpg`, parents: [newFolderId] })
+            });
+            if(!fileMetaRes.ok) throw new Error('照片中繼資料建立失敗');
+            const fileId = (await fileMetaRes.json()).id;
             
-            b.imgSrc = upRes.id; 
-            delete b.rawFile;
+            // 步驟B：將真實圖片塞入該 ID
+            const uploadRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+              method: 'PATCH', headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': task.rawFile.type },
+              body: task.rawFile
+            });
+            if(!uploadRes.ok) throw new Error('照片內容上傳失敗');
+            
+            task.targetBlock.imgSrc = fileId; // 把 JSON 裡的來源替換成雲端 ID
+            delete task.targetBlock.rawFile;
           }
           
+          // 3. 上傳專案架構檔 (project.json)
           CloudEngine.updateProgress('上傳專案架構檔 (project.json)...', 85);
           const jsonBlob = new Blob([JSON.stringify(dataToUpload)], {type: 'application/json'});
-          const jsonMeta = new Blob([JSON.stringify({ name: 'project.json', parents: [newFolderId] })], {type: 'application/json'});
-          const jsonForm = new FormData();
-          jsonForm.append('metadata', jsonMeta);
-          jsonForm.append('file', jsonBlob);
           
-          await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}` }, body: jsonForm
+          const jsonMetaRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST', headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'project.json', parents: [newFolderId] })
+          });
+          const jsonFileId = (await jsonMetaRes.json()).id;
+          
+          await fetch(`https://www.googleapis.com/upload/drive/v3/files/${jsonFileId}?uploadType=media`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${CloudEngine.token}`, 'Content-Type': 'application/json' },
+            body: jsonBlob
           });
 
           CloudEngine.updateProgress('上傳完成！', 100);
           return true;
         } catch (e) {
           console.error(e);
-          UtilityEngine.toast("上傳失敗，請檢查權限或資料夾 ID");
+          UtilityEngine.toast(e.message || "上傳失敗，請檢查權限或資料夾 ID");
           return false;
         }
       },
 
       listProjects: async (parentFolderId) => {
-        if (CloudEngine.mockMode) {
-           UtilityEngine.toast('模擬模式：讀取測試清單');
-           if(state.cloudProjects.length === 0) state.cloudProjects = [{id:'mock1', name:'(測試) 2026 京都行'}];
-           return state.cloudProjects;
-        }
         try {
           await CloudEngine.getToken();
           const q = encodeURIComponent(`'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
           const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
             headers: { 'Authorization': `Bearer ${CloudEngine.token}` }
-          }).then(r => r.json());
-          state.cloudProjects = res.files || [];
+          });
+          if (!res.ok) throw new Error('無法讀取清單');
+          state.cloudProjects = (await res.json()).files || [];
           return state.cloudProjects;
         } catch (e) {
           UtilityEngine.toast('讀取失敗，請確認資料夾 ID 與權限');
           return [];
         }
+      },
+
+      // ⚠️ 新增：完整的下載還原邏輯
+      loadProject: async (folderId) => {
+        await CloudEngine.getToken();
+        
+        // 1. 尋找資料夾內的 project.json
+        const q = encodeURIComponent(`'${folderId}' in parents and name='project.json' and trashed=false`);
+        const filesRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
+            headers: { 'Authorization': `Bearer ${CloudEngine.token}` }
+        }).then(r => r.json());
+
+        if(!filesRes.files || filesRes.files.length === 0) throw new Error('找不到專案設定檔 (project.json)');
+        const jsonId = filesRes.files[0].id;
+
+        // 2. 下載 project.json 內容
+        const projectData = await fetch(`https://www.googleapis.com/drive/v3/files/${jsonId}?alt=media`, {
+            headers: { 'Authorization': `Bearer ${CloudEngine.token}` }
+        }).then(r => r.json());
+
+        // 3. 把圖片 ID 轉回本機 Blob (這樣隱私最好，不用外開網址)
+        UtilityEngine.toast('正在下載照片資源，請稍候...');
+        for(const slide of projectData.slides) {
+            for (const block of slide.blocks) {
+                if (block.type === 'photo' && block.imgSrc && !block.imgSrc.startsWith('blob:')) {
+                    const fileId = block.imgSrc;
+                    try {
+                        const blob = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                            headers: { 'Authorization': `Bearer ${CloudEngine.token}` }
+                        }).then(r => r.blob());
+                        block.imgSrc = URL.createObjectURL(blob);
+                        block.rawFile = new File([blob], "cloud_photo.jpg", {type: blob.type}); 
+                    } catch(err) {
+                        console.error('無法下載照片', fileId);
+                    }
+                }
+            }
+        }
+
+        // 4. 套用狀態
+        state.slides = projectData.slides;
+        state.paperId = projectData.paperId || 'dowling';
+        state.activeIdx = 0;
+        state.selectedId = null;
+        document.documentElement.style.setProperty('--paper', LayoutEngine.paperColor());
+        RenderEngine.renderAll();
       }
     };
 
@@ -576,7 +622,7 @@
     };
 
     // ==========================================
-    // 3. LAYOUT ENGINE (v4 完整版)
+    // 3. LAYOUT ENGINE
     // ==========================================
     const LayoutEngine = {
       currentPaper: () => PAPER_TYPES.find(p => p.id === state.paperId) || PAPER_TYPES[1],
@@ -600,7 +646,7 @@
     };
 
     // ==========================================
-    // 4. MAP & TIMELINE ENGINE (v4 完整版)
+    // 4. MAP & TIMELINE ENGINE
     // ==========================================
     const MapEngine = {
       renderSimplifiedMapSvg: (block) => {
@@ -656,7 +702,7 @@
     };
 
     // ==========================================
-    // 5. RENDER ENGINE (v4 完整版 + 雲端 UI 修正)
+    // 5. RENDER ENGINE 
     // ==========================================
     const RenderEngine = {
       renderAll: () => { RenderEngine.renderTopbar(); RenderEngine.renderThumbs(); RenderEngine.renderCanvas(); RenderEngine.renderInspector(); },
@@ -755,14 +801,11 @@
           <div class="field">
             <label>載入雲端專案</label>
             <div style="display:flex; gap:8px; align-items: center;">
-              <!-- 已優化下拉選單樣式 -->
               <select id="cloudProjectSelect" style="flex:1;">${projectOptions}</select>
               <button class="wide-btn slim-btn" data-action="fetchCloudProjects">讀 取</button>
             </div>
           </div>
           <button class="wide-btn dark" data-action="loadCloudProject" style="background:#8F887E; color:#fff; border-color: #8F887E; margin-top:8px;">載入選取的專案</button>
-          
-          ${CloudEngine.mockMode ? `<span class="hint-text" style="color:#A15E5E; margin-top:8px;">目前為模擬模式，未設定 Google Client ID。</span>` : ''}
         </div>
         
         <div class="section"><div class="label">印刷輸出品質</div><div class="quality-card"><strong>A5 landscape / ${PRINT_MM_W} × ${PRINT_MM_H} mm</strong><small>PDF 以單頁 450×320 畫布，使用 ${PDF_EXPORT_SCALE}× 渲染為 ${PAGE_W * PDF_EXPORT_SCALE}×${PAGE_H * PDF_EXPORT_SCALE} px，約 ${dpiX}×${dpiY} DPI。</small></div></div>
@@ -788,7 +831,7 @@
     };
 
     // ==========================================
-    // 6. FLIPBOOK ENGINE (v4 完整版還原)
+    // 6. FLIPBOOK ENGINE
     // ==========================================
     const FlipBookEngine = {
       renderStaticPage: (page) => {
@@ -840,7 +883,7 @@
     };
 
     // ==========================================
-    // 7. EXPORT ENGINE (v4 完整版還原)
+    // 7. EXPORT ENGINE
     // ==========================================
     const ExportEngine = {
       fileToBase64: (file) => new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(file); }),
@@ -889,7 +932,7 @@
     };
 
     // ==========================================
-    // 8. APP ENGINE (v4 完整版互動保留)
+    // 8. APP ENGINE (Interactions)
     // ==========================================
     const AppEngine = {
       manualSave: async () => {
@@ -926,6 +969,24 @@
         if(!folderId) return UtilityEngine.toast('無資料夾 ID');
         UtilityEngine.toast('讀取中...'); await CloudEngine.listProjects(folderId); RenderEngine.renderInspector(); UtilityEngine.toast('讀取完成');
       },
+      // ⚠️ 新增：連接介面按鈕與下載引擎
+      loadCloudProject: async () => {
+        const folderId = document.getElementById('cloudProjectSelect').value;
+        if (!folderId) return UtilityEngine.toast('請先選擇雲端專案');
+        
+        const overlay = document.getElementById('exporting');
+        overlay.textContent = '連線至 Google Drive 載入專案...';
+        overlay.classList.add('show');
+        
+        try {
+            await CloudEngine.loadProject(folderId);
+            UtilityEngine.toast('專案與照片已成功載入！');
+        } catch (e) {
+            UtilityEngine.toast(e.message || '載入失敗');
+        } finally {
+            overlay.classList.remove('show');
+        }
+      },
       handleAction: (el, e) => {
         const action = el.dataset.action; const id = el.dataset.id;
         if (action === 'manualSave') AppEngine.manualSave();
@@ -960,7 +1021,7 @@
         if (action === 'closeProjectModal') AppEngine.closeProjectModal();
         if (action === 'confirmCloudUpload') AppEngine.confirmCloudUpload();
         if (action === 'fetchCloudProjects') AppEngine.fetchCloudProjects();
-        if (action === 'loadCloudProject') { if(CloudEngine.mockMode) UtilityEngine.toast('模擬模式：無法真實載入檔案'); else UtilityEngine.toast('開始從 Google Drive 載入專案資料...'); }
+        if (action === 'loadCloudProject') AppEngine.loadCloudProject(); // ⚠️ 連接實作
       },
       handleInput: (el, e) => {
         const action = el.dataset.action; const id = el.dataset.id;
